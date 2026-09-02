@@ -1,0 +1,19 @@
+{
+  "name": "jarvis",
+  "private": true,
+  "version": "0.1.0",
+  "description": "JARVIS - Gemini-based real-time conversational AI assistant",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "api:dev": "pnpm --filter @jarvis/api start:dev",
+    "api:build": "pnpm --filter @jarvis/api build",
+    "api:test": "pnpm --filter @jarvis/api test",
+    "api:test:e2e": "pnpm --filter @jarvis/api test:e2e",
+    "web:dev": "pnpm --filter @jarvis/web dev",
+    "web:build": "pnpm --filter @jarvis/web build",
+    "web:lint": "pnpm --filter @jarvis/web lint"
+  }
+}

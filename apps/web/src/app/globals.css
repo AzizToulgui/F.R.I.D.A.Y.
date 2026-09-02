@@ -1,0 +1,208 @@
+@import 'tailwindcss';
+
+:root,
+:root[data-theme='dark'] {
+  --bg: #06080a;
+  --bg2: #080b0e;
+  --bg-voice: #040608;
+  --panel: #0a0e12;
+  --panel2: #0b0f13;
+  --bubble: #141a20;
+
+  --tx: #e7edf3;
+  --tx2: #b9c3cc;
+  --tx3: #8a949e;
+  --tx4: #6d7883;
+  --tx5: #4f5964;
+
+  --line: rgba(255, 255, 255, 0.06);
+  --line2: rgba(255, 255, 255, 0.09);
+  --line3: rgba(255, 255, 255, 0.22);
+
+  --ac: #5fd8ff;
+  --ac-hi: #8fe6ff;
+  --ac-fg: #04141c;
+  --ac-tx: #9ee9ff;
+  --ac-l: rgba(95, 216, 255, 0.5);
+  --ac-m: rgba(95, 216, 255, 0.3);
+  --ac-s: rgba(95, 216, 255, 0.12);
+  --ac-xs: rgba(95, 216, 255, 0.06);
+
+  --danger: #f0a3a3;
+  --danger-line: rgba(255, 120, 120, 0.22);
+  --danger-bg: rgba(255, 120, 120, 0.08);
+  --ok: #a5e6b8;
+}
+
+:root[data-theme='light'] {
+  --bg: #f7f8fa;
+  --bg2: #eef1f5;
+  --bg-voice: #f2f5f8;
+  --panel: #ffffff;
+  --panel2: #ffffff;
+  --bubble: #e8edf3;
+
+  --tx: #0f151b;
+  --tx2: #3a454f;
+  --tx3: #5d6874;
+  --tx4: #7b8691;
+  --tx5: #9aa4af;
+
+  --line: rgba(15, 21, 27, 0.09);
+  --line2: rgba(15, 21, 27, 0.15);
+  --line3: rgba(15, 21, 27, 0.3);
+
+  --ac: #0a8fbc;
+  --ac-hi: #0b7ea6;
+  --ac-fg: #ffffff;
+  --ac-tx: #0a6a8c;
+  --ac-l: rgba(10, 143, 188, 0.55);
+  --ac-m: rgba(10, 143, 188, 0.35);
+  --ac-s: rgba(10, 143, 188, 0.13);
+  --ac-xs: rgba(10, 143, 188, 0.06);
+
+  --danger: #c0392b;
+  --danger-line: rgba(192, 57, 43, 0.25);
+  --danger-bg: rgba(192, 57, 43, 0.06);
+  --ok: #1e8a4c;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg2: var(--bg2);
+  --color-bg-voice: var(--bg-voice);
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel2);
+  --color-bubble: var(--bubble);
+
+  --color-tx: var(--tx);
+  --color-tx2: var(--tx2);
+  --color-tx3: var(--tx3);
+  --color-tx4: var(--tx4);
+  --color-tx5: var(--tx5);
+
+  --color-line: var(--line);
+  --color-line2: var(--line2);
+  --color-line3: var(--line3);
+
+  --color-ac: var(--ac);
+  --color-ac-hi: var(--ac-hi);
+  --color-ac-fg: var(--ac-fg);
+  --color-ac-tx: var(--ac-tx);
+  --color-ac-l: var(--ac-l);
+  --color-ac-m: var(--ac-m);
+  --color-ac-s: var(--ac-s);
+  --color-ac-xs: var(--ac-xs);
+
+  --color-danger: var(--danger);
+  --color-danger-line: var(--danger-line);
+  --color-danger-bg: var(--danger-bg);
+  --color-ok: var(--ok);
+
+  --font-sans: var(--font-space-grotesk), Helvetica, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--tx);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  textarea {
+    resize: none;
+  }
+
+  button {
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease,
+      opacity 0.15s ease;
+  }
+
+  ::selection {
+    background: rgba(95, 216, 255, 0.25);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line2);
+    border-radius: 8px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@keyframes jv-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes jv-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.06);
+  }
+}
+@keyframes jv-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+@keyframes jv-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@layer components {
+  .jv-toggle {
+    @apply relative h-[19px] w-[34px] flex-none cursor-pointer rounded-full border-0 bg-line2 p-0;
+  }
+  .jv-toggle::after {
+    content: '';
+    @apply absolute top-0.5 left-0.5 h-[15px] w-[15px] rounded-full bg-tx5 transition-all duration-150;
+  }
+  .jv-toggle.is-on {
+    @apply bg-ac;
+  }
+  .jv-toggle.is-on::after {
+    left: 17px;
+    @apply bg-ac-fg;
+  }
+}
