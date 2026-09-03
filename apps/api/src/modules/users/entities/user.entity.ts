@@ -3,6 +3,7 @@ import { Exclude } from 'class-transformer';
 import { BaseEntity } from '../../../database/entities/base.entity';
 import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 import { Conversation } from '../../conversations/entities/conversation.entity';
+import { Memory } from '../../memory/entities/memory.entity';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -27,4 +28,7 @@ export class User extends BaseEntity {
 
   @OneToMany(() => Conversation, (conversation) => conversation.user)
   conversations?: Conversation[];
+
+  @OneToMany(() => Memory, (memory) => memory.user)
+  memories?: Memory[];
 }

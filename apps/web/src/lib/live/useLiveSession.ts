@@ -5,7 +5,28 @@ import { useAuth } from '@/lib/auth/AuthProvider';
 import { AudioCapture } from './AudioCapture';
 import { AudioPlayback } from './AudioPlayback';
 import { LiveClient } from './LiveClient';
-import type { LiveConnectionState, LiveSessionTokenResponse } from './types';
+import type { LiveConnectionState, LiveFunctionCall, LiveFunctionResponse, LiveSessionTokenResponse } from './types';
+
+interface InvokeToolResponse {
+  output?: unknown;
+}
+
+// getUserMedia rejects with a named DOMException - the generic
+// "Permission denied" message it carries doesn't tell the user what to do
+// about it, so map the cases worth distinguishing to actionable copy.
+function describeMicError(error: unknown): string {
+  const name = error instanceof DOMException ? error.name : null;
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+    return 'Microphone access was denied. Allow it for this site in your browser settings, then try again.';
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return 'No microphone was found. Connect one and try again.';
+  }
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return 'The microphone is already in use by another app or tab.';
+  }
+  return error instanceof Error ? error.message : 'Microphone access was denied or unavailable.';
+}
 
 export interface UseLiveSessionResult {
   state: LiveConnectionState;
@@ -23,6 +44,10 @@ export interface UseLiveSessionResult {
   toggleMuted: () => void;
   start: () => Promise<void>;
   stop: () => void;
+  /** Current mic input level, 0-1 - polled from an animation loop (e.g. the orb), not reactive state. */
+  getMicLevel: () => number;
+  /** Current model output level, 0-1 - polled from an animation loop, not reactive state. */
+  getOutputLevel: () => number;
 }
 
 export function useLiveSession(): UseLiveSessionResult {
@@ -46,8 +71,33 @@ export function useLiveSession(): UseLiveSessionResult {
     if (clientRef.current) return clientRef.current;
     playbackRef.current = new AudioPlayback();
 
+    // Relays a Gemini tool_call to the authenticated backend and turns the
+    // result (or any failure - network, validation, unknown tool) into a
+    // FunctionResponse - see ARCHITECTURE.md Section 3's tool calling relay.
+    // This hook never decides whether a call is allowed; ToolExecutionService does.
+    const executeToolCalls = async (calls: LiveFunctionCall[]): Promise<LiveFunctionResponse[]> => {
+      return Promise.all(
+        calls.map(async (call): Promise<LiveFunctionResponse> => {
+          try {
+            const result = await authFetch<InvokeToolResponse>(`/tools/${encodeURIComponent(call.name)}/invoke`, {
+              method: 'POST',
+              body: JSON.stringify({ arguments: call.args }),
+            });
+            return { name: call.name, id: call.id, response: { output: result.output } };
+          } catch (e) {
+            return {
+              name: call.name,
+              id: call.id,
+              response: { error: e instanceof Error ? e.message : 'Tool execution failed.' },
+            };
+          }
+        }),
+      );
+    };
+
     const client = new LiveClient({
       getToken: () => authFetch<LiveSessionTokenResponse>('/live/session', { method: 'POST' }),
+      executeToolCalls,
       callbacks: {
         onStateChange: (next) => {
           setState(next);
@@ -129,7 +179,7 @@ export function useLiveSession(): UseLiveSessionResult {
         captureRef.current.setMuted(muted);
       }
     } catch (e) {
-      setErrorMessage(e instanceof Error ? e.message : 'Microphone access was denied or unavailable.');
+      setErrorMessage(describeMicError(e));
     }
     // `muted` is read, not depended on, at start time only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -158,6 +208,9 @@ export function useLiveSession(): UseLiveSessionResult {
     });
   }, []);
 
+  const getMicLevel = useCallback(() => captureRef.current?.getLevel() ?? 0, []);
+  const getOutputLevel = useCallback(() => playbackRef.current?.getLevel() ?? 0, []);
+
   // Session cleanup: tear the connection and hardware streams down if the
   // component holding this hook unmounts without calling stop() itself.
   useEffect(() => stop, [stop]);
@@ -175,5 +228,7 @@ export function useLiveSession(): UseLiveSessionResult {
     toggleMuted,
     start,
     stop,
+    getMicLevel,
+    getOutputLevel,
   };
 }

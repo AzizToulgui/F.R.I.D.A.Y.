@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { SearchPalette } from './SearchPalette';
@@ -14,8 +14,7 @@ import { SettingsView } from '@/views/SettingsView';
 import { useChat } from '@/lib/chat/useChat';
 import type { Route, Theme } from '@/types';
 
-const ROUTE_TITLES: Record<Route, string> = {
-  chat: 'Project architecture',
+const ROUTE_TITLES: Record<Exclude<Route, 'chat'>, string> = {
   home: 'New conversation',
   memory: 'Memory',
   knowledge: 'Knowledge',
@@ -25,16 +24,43 @@ const ROUTE_TITLES: Record<Route, string> = {
 
 export function AppShell() {
   const [theme, setTheme] = useState<Theme>('dark');
-  const [route, setRoute] = useState<Route>('chat');
+  // Defaults to the "New conversation" screen rather than the empty chat
+  // view - the effect below switches to 'chat' exactly once, if a saved
+  // conversation turns out to be resumed on mount.
+  const [route, setRoute] = useState<Route>('home');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [draft, setDraft] = useState('');
-  const { msgs, streaming, error: chatError, send: sendChat, reset: resetChat } = useChat();
+  const {
+    msgs,
+    streaming,
+    error: chatError,
+    send: sendChat,
+    reset: resetChat,
+    conversations,
+    activeConversationId,
+    switchTo,
+    removeConversation,
+    renameConversation,
+  } = useChat();
+  const activeTitle = conversations.find((c) => c.id === activeConversationId)?.title ?? 'New conversation';
+  const title = route === 'chat' ? activeTitle : ROUTE_TITLES[route];
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  // Mirrors the mount-time auto-resume in useChat: if it lands a saved
+  // conversation, jump to 'chat' to show it - but only that once, so it
+  // doesn't fight with the user navigating elsewhere afterward.
+  const didAutoResumeRoute = useRef(false);
+  useEffect(() => {
+    if (!didAutoResumeRoute.current && activeConversationId) {
+      didAutoResumeRoute.current = true;
+      setRoute('chat');
+    }
+  }, [activeConversationId]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -64,20 +90,36 @@ export function AppShell() {
 
   const openVoice = useCallback(() => setVoiceOpen(true), []);
 
+  const selectConversation = useCallback(
+    (id: string) => {
+      setRoute('chat');
+      void switchTo(id);
+    },
+    [switchTo],
+  );
+
   return (
     <div className="relative flex h-screen w-full overflow-hidden bg-bg">
       <Sidebar
         open={sidebarOpen}
         route={route}
+        conversations={conversations}
+        activeConversationId={activeConversationId}
         onToggle={() => setSidebarOpen((v) => !v)}
         onNewChat={newChat}
         onOpenSearch={() => setSearchOpen(true)}
         onNavigate={setRoute}
         onOpenSettings={() => setRoute('settings')}
+        onSelectConversation={selectConversation}
+        onDeleteConversation={(id) => {
+          if (activeConversationId === id) setRoute('home');
+          void removeConversation(id);
+        }}
+        onRenameConversation={(id, newTitle) => void renameConversation(id, newTitle)}
       />
       <main className="flex min-w-0 flex-1 flex-col [background:radial-gradient(1200px_700px_at_50%_-10%,var(--ac-xs),transparent_70%),var(--bg)]">
         <TopBar
-          title={ROUTE_TITLES[route]}
+          title={title}
           theme={theme}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
           onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
@@ -94,6 +136,7 @@ export function AppShell() {
             onSend={send}
             onSuggestion={setDraft}
             onOpenVoice={openVoice}
+            onOpenTools={() => setRoute('tools')}
           />
         )}
         {route === 'home' && (
@@ -103,6 +146,7 @@ export function AppShell() {
             onDraftChange={setDraft}
             onSend={send}
             onOpenVoice={openVoice}
+            onOpenTools={() => setRoute('tools')}
             onSuggestion={setDraft}
           />
         )}

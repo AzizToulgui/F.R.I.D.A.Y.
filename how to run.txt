@@ -1,0 +1,8 @@
+#for docker container (from root)
+docker compose up -d
+#for api
+cd apps/api
+pnpm start:dev
+#for web
+cd apps/web
+pnpm dev

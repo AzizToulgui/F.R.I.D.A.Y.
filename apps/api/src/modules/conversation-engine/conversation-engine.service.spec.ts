@@ -1,11 +1,17 @@
+import { getQueueToken } from '@nestjs/bullmq';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AIProvider } from '../ai-provider/ai-provider.interface';
 import { GenerateTextResult } from '../ai-provider/ai-provider.types';
 import { ConversationsService } from '../conversations/conversations.service';
-import { Conversation } from '../conversations/entities/conversation.entity';
+import { Conversation, DEFAULT_CONVERSATION_TITLE } from '../conversations/entities/conversation.entity';
+import { DocumentsService } from '../documents/documents.service';
+import { MemoriesService } from '../memory/memories.service';
 import { Message, MessageRole } from '../messages/entities/message.entity';
 import { MessagesService } from '../messages/messages.service';
+import { ToolExecutionService } from '../tools/tool-execution.service';
+import { ToolRegistryService } from '../tools/tool-registry.service';
+import { CONVERSATION_TITLING_QUEUE } from './conversation-titling.queue';
 import { ConversationEngineService } from './conversation-engine.service';
 import { JARVIS_TEXT_SYSTEM_PROMPT } from '../ai-provider/jarvis-persona';
 
@@ -28,7 +34,7 @@ function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
   return {
     id: 'conv-1',
     userId: 'user-1',
-    title: 'New conversation',
+    title: DEFAULT_CONVERSATION_TITLE,
     summary: null,
     summaryUpToMessageId: null,
     customInstructions: null,
@@ -67,6 +73,11 @@ describe('ConversationEngineService', () => {
     createInternal: jest.Mock;
     updateTokenCount: jest.Mock;
   };
+  let memoriesService: { retrieveRelevant: jest.Mock; enqueueExtraction: jest.Mock };
+  let documentsService: { retrieveRelevantChunks: jest.Mock };
+  let toolRegistry: { getDeclarations: jest.Mock };
+  let toolExecutionService: { invokeAll: jest.Mock };
+  let titlingQueue: { add: jest.Mock };
   let buildService: (maxHistoryTokens?: number) => Promise<ConversationEngineService>;
 
   beforeEach(() => {
@@ -104,6 +115,14 @@ describe('ConversationEngineService', () => {
         return Promise.resolve();
       }),
     };
+    memoriesService = {
+      retrieveRelevant: jest.fn().mockResolvedValue([]),
+      enqueueExtraction: jest.fn().mockResolvedValue(undefined),
+    };
+    documentsService = { retrieveRelevantChunks: jest.fn().mockResolvedValue([]) };
+    toolRegistry = { getDeclarations: jest.fn().mockReturnValue([]) };
+    toolExecutionService = { invokeAll: jest.fn().mockResolvedValue([]) };
+    titlingQueue = { add: jest.fn().mockResolvedValue(undefined) };
 
     buildService = async (maxHistoryTokens = 1000) => {
       const configService = {
@@ -115,7 +134,12 @@ describe('ConversationEngineService', () => {
           ConversationEngineService,
           { provide: ConversationsService, useValue: conversationsService },
           { provide: MessagesService, useValue: messagesService },
+          { provide: MemoriesService, useValue: memoriesService },
+          { provide: DocumentsService, useValue: documentsService },
+          { provide: ToolRegistryService, useValue: toolRegistry },
+          { provide: ToolExecutionService, useValue: toolExecutionService },
           { provide: AIProvider, useValue: aiProvider },
+          { provide: getQueueToken(CONVERSATION_TITLING_QUEUE), useValue: titlingQueue },
           { provide: ConfigService, useValue: configService },
         ],
       }).compile();
@@ -241,7 +265,9 @@ describe('ConversationEngineService', () => {
     expect(result.content).toBe('ok');
     expect(conversation.summary).toBeNull();
     expect(conversation.summaryUpToMessageId).toBeNull();
-    expect(conversationsService.saveInternal).not.toHaveBeenCalled();
+    // saveInternal is still called once - to bump updated_at for the
+    // sidebar's recency ordering - just not as part of summarization.
+    expect(conversationsService.saveInternal).toHaveBeenCalledTimes(1);
   });
 
   it('caches a lazily-computed token count back onto the message row', async () => {
@@ -254,5 +280,85 @@ describe('ConversationEngineService', () => {
     await drain(service.streamTurn(conversation, 'hi'));
 
     expect(messagesService.updateTokenCount).toHaveBeenCalledWith('m-old-1', 6);
+  });
+
+  it('resolves a tool call before producing the final reply, and never persists the round trip as a message', async () => {
+    const call = { name: 'get_current_time', args: {} };
+    aiProvider.generateTextStream
+      .mockReturnValueOnce(fakeStream([], { content: '', usage: { promptTokens: 1, completionTokens: 0, totalTokens: 1 }, functionCalls: [call] }))
+      .mockReturnValueOnce(
+        fakeStream(['It is ', 'noon.'], {
+          content: 'It is noon.',
+          usage: { promptTokens: 2, completionTokens: 2, totalTokens: 4 },
+        }),
+      );
+    toolExecutionService.invokeAll.mockResolvedValue([{ name: 'get_current_time', response: { output: { iso: 'noon' } } }]);
+
+    const service = await buildService();
+    const conversation = makeConversation();
+    const { values, result } = await drain(service.streamTurn(conversation, 'what time is it?'));
+
+    expect(values).toEqual(['It is ', 'noon.']);
+    expect(result.content).toBe('It is noon.');
+    expect(toolExecutionService.invokeAll).toHaveBeenCalledWith({ userId: 'user-1', conversationId: 'conv-1' }, [call]);
+
+    // Only the user message and the final assistant reply are persisted -
+    // the tool-call/tool-response round trip is audited elsewhere (ToolInvocation), not stored as a Message.
+    expect(messagesService.createInternal).toHaveBeenCalledTimes(2);
+    expect(messagesService.createInternal).toHaveBeenNthCalledWith(
+      2,
+      'conv-1',
+      MessageRole.ASSISTANT,
+      'It is noon.',
+      { tokenCount: 2, metadata: { promptTokens: 2, totalTokens: 4 } },
+    );
+
+    const secondCallMessages = aiProvider.generateTextStream.mock.calls[1][0].messages;
+    expect(secondCallMessages).toEqual([
+      { role: 'user', content: 'what time is it?' },
+      { role: 'model', content: '', functionCalls: [call] },
+      { role: 'user', content: '', functionResponses: [{ name: 'get_current_time', response: { output: { iso: 'noon' } } }] },
+    ]);
+  });
+
+  it('stops requesting tools after MAX_TOOL_ROUNDS and returns whatever the last round produced', async () => {
+    const call = { name: 'get_current_time', args: {} };
+    // mockImplementation (not mockReturnValue): each round-trip iteration
+    // calls generateTextStream again and must get a *fresh* generator - a
+    // shared one would already be exhausted after the first `yield*`.
+    aiProvider.generateTextStream.mockImplementation(() =>
+      fakeStream([], { content: '', usage: { promptTokens: 1, completionTokens: 0, totalTokens: 1 }, functionCalls: [call] }),
+    );
+    toolExecutionService.invokeAll.mockResolvedValue([{ name: 'get_current_time', response: { output: {} } }]);
+
+    const service = await buildService();
+    const conversation = makeConversation();
+    await drain(service.streamTurn(conversation, 'loop forever'));
+
+    // MAX_TOOL_ROUNDS (4) tool round trips, plus the final round that isn't followed by another tool execution.
+    expect(aiProvider.generateTextStream).toHaveBeenCalledTimes(5);
+    expect(toolExecutionService.invokeAll).toHaveBeenCalledTimes(4);
+  });
+
+  it('enqueues a titling job while the conversation is still untitled', async () => {
+    aiProvider.generateTextStream.mockReturnValue(
+      fakeStream(['hi'], { content: 'hi', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } }),
+    );
+    const service = await buildService();
+    const conversation = makeConversation({ title: DEFAULT_CONVERSATION_TITLE });
+    await drain(service.streamTurn(conversation, 'hello'));
+
+    expect(titlingQueue.add).toHaveBeenCalledWith('title', { conversationId: 'conv-1', userId: 'user-1' });
+  });
+
+  it('does not enqueue a titling job once the conversation already has a real title', async () => {
+    aiProvider.generateTextStream.mockReturnValue(
+      fakeStream(['hi'], { content: 'hi', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } }),
+    );
+    const service = await buildService();
+    const conversation = makeConversation({ title: 'Renamed by the user' });
+    await drain(service.streamTurn(conversation, 'hello'));
+
+    expect(titlingQueue.add).not.toHaveBeenCalled();
   });
 });

@@ -3,12 +3,19 @@
 import { useEffect, useRef } from 'react';
 import type { OrbMode } from '@/types';
 
-function ampFor(mode: OrbMode, t: number): number {
+// `level` is the real, smoothed 0-1 mic/output level (see useOrbCanvas's
+// renderFrame) - listening/speaking blend a gentle ambient idle motion with
+// however loud the actual audio is right now, so the orb visibly breathes
+// with speech instead of just playing a canned loop. Modes with no
+// corresponding real audio signal (thinking/error/idle) stay purely synthetic.
+function ampFor(mode: OrbMode, t: number, level: number): number {
   if (mode === 'listening') {
-    return 0.42 + 0.34 * Math.abs(Math.sin(t * 3.1) * 0.6 + Math.sin(t * 7.7) * 0.3 + Math.sin(t * 13.3) * 0.12);
+    const ambient = 0.22 + 0.05 * Math.sin(t * 1.3);
+    return ambient + level * 0.68;
   }
   if (mode === 'speaking') {
-    return 0.5 + 0.4 * Math.abs(Math.sin(t * 5.4) * 0.5 + Math.sin(t * 11.1) * 0.35 + Math.sin(t * 2.3) * 0.2);
+    const ambient = 0.26 + 0.05 * Math.sin(t * 1.7);
+    return ambient + level * 0.78;
   }
   if (mode === 'thinking') return 0.3 + 0.06 * Math.sin(t * 2.2);
   if (mode === 'error') return 0.18 + 0.04 * Math.sin(t * 1.6);
@@ -100,8 +107,14 @@ function drawOrb(
   }
 }
 
-/** Draws the JARVIS orb (idle/listening/thinking/speaking/interrupted/error) on a canvas via rAF. */
-export function useOrbCanvas(mode: OrbMode, isLight: boolean) {
+/**
+ * Draws the JARVIS orb (idle/listening/thinking/speaking/interrupted/error)
+ * on a canvas via rAF. `getLevel`, when given, is polled every frame (not a
+ * React value - audio levels change far faster than a re-render should) and
+ * smoothed here before feeding ampFor, so raw analyser jitter doesn't make
+ * the orb flicker.
+ */
+export function useOrbCanvas(mode: OrbMode, isLight: boolean, getLevel?: () => number) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -113,12 +126,15 @@ export function useOrbCanvas(mode: OrbMode, isLight: boolean) {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let t = 0;
     let scale = 1;
+    let smoothedLevel = 0;
     let raf = 0;
 
     const renderFrame = () => {
       const target = mode === 'interrupted' ? 0.72 : 1;
       scale += (target - scale) * 0.22;
-      drawOrb(ctx, canvas.width, canvas.height, t, scale, mode, ampFor(mode, t), isLight);
+      const rawLevel = getLevel ? getLevel() : 0;
+      smoothedLevel += (rawLevel - smoothedLevel) * 0.35;
+      drawOrb(ctx, canvas.width, canvas.height, t, scale, mode, ampFor(mode, t, smoothedLevel), isLight);
     };
 
     if (reduceMotion) {
@@ -133,7 +149,7 @@ export function useOrbCanvas(mode: OrbMode, isLight: boolean) {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [mode, isLight]);
+  }, [mode, isLight, getLevel]);
 
   return canvasRef;
 }

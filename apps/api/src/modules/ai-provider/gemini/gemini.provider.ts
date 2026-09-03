@@ -1,17 +1,19 @@
-import { Injectable, Logger, NotImplementedException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Content, GoogleGenAI, Modality } from '@google/genai';
-import type { GenerateContentResponseUsageMetadata } from '@google/genai';
+import { Content, GoogleGenAI, Modality, ThinkingLevel } from '@google/genai';
+import type { FunctionCall, GenerateContentResponseUsageMetadata, Part, Tool } from '@google/genai';
 import { GeminiConfig } from '../../../config/gemini.config';
 import { AIProvider } from '../ai-provider.interface';
 import {
   ChatMessage,
   CountTokensParams,
   EmbeddingResult,
+  FunctionCallRequest,
   GenerateTextParams,
   GenerateTextResult,
   LiveSessionToken,
   TokenUsage,
+  ToolDeclaration,
 } from '../ai-provider.types';
 import { JARVIS_VOICE_SYSTEM_PROMPT } from '../jarvis-persona';
 
@@ -29,19 +31,38 @@ const NEW_SESSION_WINDOW_SECONDS = 60;
 // it and the client must reconnect with a fresh token.
 const SESSION_LIFETIME_SECONDS = 30 * 60;
 
-// Chat is a latency- and cost-sensitive path (Section 18) - Gemini 2.5's
-// extended "thinking" is worth it for hard reasoning tasks but not for a
+// Chat is a latency- and cost-sensitive path (Section 18) - extended
+// "thinking" is worth it for hard reasoning tasks but not for a
 // conversational assistant reply, so it's switched off here rather than left
-// at the model default.
-const CHAT_THINKING_BUDGET = 0;
+// at the model default. Only applied when using the default text model
+// (params.model unset): background jobs that explicitly override the model
+// (memory extraction, conversation titling - always a cheaper Lite-tier
+// model) get the model's own default thinking behavior instead, since not
+// every model accepts a disabled-thinking config the same way -
+// gemini-3.5-flash-lite rejects thinkingBudget: 0 outright with a 400 (only
+// accepts -1/dynamic or a positive budget), and gemini-3.6-flash (the
+// primary chat model) *also* rejects thinkingBudget: 0 the same way but
+// accepts thinkingLevel: 'minimal' instead, which verified empirically to
+// produce zero thinking tokens - same effect, different knob per model
+// generation.
+function thinkingConfigFor(params: GenerateTextParams): { thinkingLevel: ThinkingLevel } | undefined {
+  return params.model ? undefined : { thinkingLevel: ThinkingLevel.MINIMAL };
+}
 
 function toContents(messages: ChatMessage[]): Content[] {
   return messages
     .filter((message) => message.role !== 'system')
-    .map((message) => ({
-      role: message.role === 'model' ? 'model' : 'user',
-      parts: [{ text: message.content }],
-    }));
+    .map((message) => {
+      const parts: Part[] = [];
+      if (message.content) parts.push({ text: message.content });
+      for (const call of message.functionCalls ?? []) {
+        parts.push({ functionCall: { name: call.name, args: call.args, id: call.id } });
+      }
+      for (const response of message.functionResponses ?? []) {
+        parts.push({ functionResponse: { name: response.name, response: response.response, id: response.id } });
+      }
+      return { role: message.role === 'model' ? 'model' : 'user', parts };
+    });
 }
 
 function toUsage(usage?: GenerateContentResponseUsageMetadata): TokenUsage {
@@ -52,9 +73,29 @@ function toUsage(usage?: GenerateContentResponseUsageMetadata): TokenUsage {
   };
 }
 
+// Provider-agnostic ToolDeclaration -> the Gemini SDK's Tool shape. All of a
+// turn's tools are declared under one Tool entry, matching how Gemini expects them.
+function toGeminiTools(tools?: ToolDeclaration[]): Tool[] | undefined {
+  if (!tools?.length) return undefined;
+  return [
+    {
+      functionDeclarations: tools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        parametersJsonSchema: tool.parametersJsonSchema,
+      })),
+    },
+  ];
+}
+
+function toFunctionCallRequests(calls?: FunctionCall[]): FunctionCallRequest[] | undefined {
+  if (!calls?.length) return undefined;
+  return calls.map((call) => ({ name: call.name ?? '', args: call.args ?? {}, id: call.id }));
+}
+
 // Concrete Gemini implementation of AIProvider. Live session token minting
-// (Step 4), text generation/streaming and token counting (Step 7) are wired
-// to the real API; embeddings remain a stub until RAG (Step 11).
+// (Step 4), text generation/streaming and token counting (Step 7), and
+// embeddings (Step 9, reused by RAG in Step 11) are wired to the real API.
 @Injectable()
 export class GeminiProvider extends AIProvider {
   private readonly logger = new Logger(GeminiProvider.name);
@@ -88,14 +129,19 @@ export class GeminiProvider extends AIProvider {
     const ai = this.stableClient();
     try {
       const response = await ai.models.generateContent({
-        model: this.config.textModel,
+        model: params.model ?? this.config.textModel,
         contents: toContents(params.messages),
         config: {
           systemInstruction: params.systemInstruction,
-          thinkingConfig: { thinkingBudget: CHAT_THINKING_BUDGET },
+          thinkingConfig: thinkingConfigFor(params),
+          tools: toGeminiTools(params.tools),
         },
       });
-      return { content: response.text ?? '', usage: toUsage(response.usageMetadata) };
+      return {
+        content: response.text ?? '',
+        usage: toUsage(response.usageMetadata),
+        functionCalls: toFunctionCallRequests(response.functionCalls),
+      };
     } catch (error) {
       this.logger.error('Gemini generateText failed', error instanceof Error ? error.stack : error);
       throw new ServiceUnavailableException('Could not reach Gemini for a text response right now.');
@@ -104,14 +150,19 @@ export class GeminiProvider extends AIProvider {
 
   async *generateTextStream(params: GenerateTextParams): AsyncGenerator<string, GenerateTextResult, void> {
     const ai = this.stableClient();
-    let stream: AsyncGenerator<{ text?: string; usageMetadata?: GenerateContentResponseUsageMetadata }>;
+    let stream: AsyncGenerator<{
+      text?: string;
+      usageMetadata?: GenerateContentResponseUsageMetadata;
+      functionCalls?: FunctionCall[];
+    }>;
     try {
       stream = await ai.models.generateContentStream({
-        model: this.config.textModel,
+        model: params.model ?? this.config.textModel,
         contents: toContents(params.messages),
         config: {
           systemInstruction: params.systemInstruction,
-          thinkingConfig: { thinkingBudget: CHAT_THINKING_BUDGET },
+          thinkingConfig: thinkingConfigFor(params),
+          tools: toGeminiTools(params.tools),
         },
       });
     } catch (error) {
@@ -124,6 +175,7 @@ export class GeminiProvider extends AIProvider {
 
     let content = '';
     let usage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    let functionCalls: FunctionCallRequest[] | undefined;
     try {
       for await (const chunk of stream) {
         if (chunk.text) {
@@ -131,12 +183,13 @@ export class GeminiProvider extends AIProvider {
           yield chunk.text;
         }
         if (chunk.usageMetadata) usage = toUsage(chunk.usageMetadata);
+        if (chunk.functionCalls?.length) functionCalls = toFunctionCallRequests(chunk.functionCalls);
       }
     } catch (error) {
       this.logger.error('Gemini generateTextStream failed mid-stream', error instanceof Error ? error.stack : error);
       throw new ServiceUnavailableException('The response from Gemini was interrupted.');
     }
-    return { content, usage };
+    return { content, usage, functionCalls };
   }
 
   async countTokens(params: CountTokensParams): Promise<number> {
@@ -153,13 +206,29 @@ export class GeminiProvider extends AIProvider {
     }
   }
 
-  async generateEmbedding(_text: string): Promise<EmbeddingResult> {
-    throw new NotImplementedException(
-      'GeminiProvider.generateEmbedding is implemented in a later step (RAG).',
-    );
+  async generateEmbedding(text: string): Promise<EmbeddingResult> {
+    const ai = this.stableClient();
+    try {
+      const response = await ai.models.embedContent({
+        model: this.config.embeddingModel,
+        contents: [text],
+        // Fixed size (not the model's native dimensionality) because the
+        // pgvector column width is fixed at migration time - see
+        // GeminiConfig.embeddingDimensions.
+        config: { outputDimensionality: this.config.embeddingDimensions },
+      });
+      const vector = response.embeddings?.[0]?.values;
+      if (!vector) {
+        throw new Error('Gemini returned no embedding values.');
+      }
+      return { vector };
+    } catch (error) {
+      this.logger.error('Gemini generateEmbedding failed', error instanceof Error ? error.stack : error);
+      throw new ServiceUnavailableException('Could not reach Gemini for an embedding right now.');
+    }
   }
 
-  async mintLiveSessionToken(): Promise<LiveSessionToken> {
+  async mintLiveSessionToken(tools?: ToolDeclaration[]): Promise<LiveSessionToken> {
     if (!this.config.apiKey) {
       throw new ServiceUnavailableException('Live voice sessions are not configured on this server.');
     }
@@ -195,6 +264,7 @@ export class GeminiProvider extends AIProvider {
               // generation does, so JARVIS's identity/multilingual behavior
               // has to be locked in here, once, for the whole session.
               systemInstruction: JARVIS_VOICE_SYSTEM_PROMPT,
+              tools: toGeminiTools(tools),
             },
           },
         },

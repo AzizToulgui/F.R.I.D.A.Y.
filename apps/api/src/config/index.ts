@@ -5,4 +5,6 @@ export * from './jwt.config';
 export * from './throttle.config';
 export * from './gemini.config';
 export * from './conversation.config';
+export * from './memory.config';
+export * from './rag.config';
 export * from './validation.schema';

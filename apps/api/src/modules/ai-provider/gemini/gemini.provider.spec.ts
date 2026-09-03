@@ -18,6 +18,7 @@ jest.mock('@google/genai', () => ({
     },
   })),
   Modality: { AUDIO: 'AUDIO' },
+  ThinkingLevel: { MINIMAL: 'minimal', LOW: 'low', MEDIUM: 'medium', HIGH: 'high' },
 }));
 
 describe('GeminiProvider.mintLiveSessionToken', () => {
@@ -133,7 +134,7 @@ describe('GeminiProvider text generation', () => {
     expect(call.model).toBe('gemini-2.5-flash');
     expect(call.contents).toEqual([{ role: 'user', parts: [{ text: 'hi' }] }]);
     expect(call.config.systemInstruction).toBe('be terse');
-    expect(call.config.thinkingConfig).toEqual({ thinkingBudget: 0 });
+    expect(call.config.thinkingConfig).toEqual({ thinkingLevel: 'minimal' });
   });
 
   it('generateText maps a model-role history entry to Gemini "model"', async () => {

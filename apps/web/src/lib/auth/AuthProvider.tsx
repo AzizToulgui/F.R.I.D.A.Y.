@@ -130,8 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           credentials: 'include',
           headers: {
             // Fastify rejects a JSON content-type header on a body-less
-            // request, so only set it when there's actually a body to send.
-            ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+            // request, so only set it when there's actually a body to send -
+            // and never on a FormData body (file uploads), where fetch must
+            // set its own Content-Type with the multipart boundary itself.
+            ...(init?.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
             ...(accessTokenRef.current ? { Authorization: `Bearer ${accessTokenRef.current}` } : {}),
             ...init?.headers,
           },

@@ -7,10 +7,12 @@ interface OrbProps {
   mode: OrbMode;
   isLight: boolean;
   size: 'home' | 'voice';
+  /** Real mic/output level to react to, 0-1 - see useLiveSession. Omit for a purely synthetic animation. */
+  getLevel?: () => number;
 }
 
-export function Orb({ mode, isLight, size }: OrbProps) {
-  const canvasRef = useOrbCanvas(mode, isLight);
+export function Orb({ mode, isLight, size, getLevel }: OrbProps) {
+  const canvasRef = useOrbCanvas(mode, isLight, getLevel);
   const intrinsic = size === 'home' ? 360 : 760;
 
   return (

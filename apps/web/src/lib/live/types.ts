@@ -36,6 +36,18 @@ export interface LiveTurnEvent {
   inputText?: string;
 }
 
+export interface LiveFunctionCall {
+  name: string;
+  args: Record<string, unknown>;
+  id?: string;
+}
+
+export interface LiveFunctionResponse {
+  name: string;
+  id?: string;
+  response: Record<string, unknown>;
+}
+
 export interface LiveClientCallbacks {
   onStateChange?: (state: LiveConnectionState) => void;
   onTurn?: (event: LiveTurnEvent) => void;

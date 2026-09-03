@@ -3,6 +3,12 @@ import { BaseEntity } from '../../../database/entities/base.entity';
 import { User } from '../../users/entities/user.entity';
 import { Message } from '../../messages/entities/message.entity';
 
+// The sentinel a conversation's title starts as - doubles as the trigger
+// condition for auto-titling (ConversationTitlingProcessor only ever
+// generates/overwrites a title while it's still exactly this), so a user's
+// manual rename is never clobbered and a conversation is never re-titled twice.
+export const DEFAULT_CONVERSATION_TITLE = 'New conversation';
+
 @Entity('conversations')
 export class Conversation extends BaseEntity {
   @Index()
@@ -13,7 +19,7 @@ export class Conversation extends BaseEntity {
   @JoinColumn({ name: 'user_id' })
   user?: User;
 
-  @Column({ type: 'varchar', length: 200, default: 'New conversation' })
+  @Column({ type: 'varchar', length: 200, default: DEFAULT_CONVERSATION_TITLE })
   title!: string;
 
   // Rolling summary of older turns, extended in place by ConversationEngineService
@@ -29,6 +35,13 @@ export class Conversation extends BaseEntity {
   // not a relation the app ever joins through).
   @Column({ name: 'summary_up_to_message_id', type: 'uuid', nullable: true })
   summaryUpToMessageId!: string | null;
+
+  // Same pointer pattern as summaryUpToMessageId, but for the memory
+  // extraction background job (MemoryExtractionProcessor) - advanced only on
+  // a successful extraction pass, so a failed job's messages are retried
+  // (and not resent alongside an ever-growing history) on the next turn.
+  @Column({ name: 'memory_extracted_up_to_message_id', type: 'uuid', nullable: true })
+  memoryExtractedUpToMessageId!: string | null;
 
   // User-supplied instructions scoped to this conversation (e.g. "reply in
   // French", "keep answers under two sentences") - folded into the system

@@ -9,13 +9,34 @@ export class AudioPlayback {
   private context: AudioContext | null = null;
   private nextStartTime = 0;
   private activeSources: AudioBufferSourceNode[] = [];
+  private analyser: AnalyserNode | null = null;
+  private levelData: Uint8Array<ArrayBuffer> | null = null;
 
   private ensureContext(): AudioContext {
     if (!this.context) {
       this.context = new AudioContext({ sampleRate: OUTPUT_SAMPLE_RATE });
       this.nextStartTime = this.context.currentTime;
+      // Every buffer source routes through this one shared analyser on its
+      // way to destination, so getLevel() reflects whatever's audible right
+      // now regardless of how many scheduled chunks are overlapping.
+      this.analyser = this.context.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.levelData = new Uint8Array(this.analyser.frequencyBinCount);
+      this.analyser.connect(this.context.destination);
     }
     return this.context;
+  }
+
+  /** Current output level as a rough 0-1 RMS value - polled from an animation loop, not pushed. */
+  getLevel(): number {
+    if (!this.analyser || !this.levelData) return 0;
+    this.analyser.getByteTimeDomainData(this.levelData);
+    let sumSquares = 0;
+    for (let i = 0; i < this.levelData.length; i++) {
+      const normalized = (this.levelData[i] - 128) / 128;
+      sumSquares += normalized * normalized;
+    }
+    return Math.sqrt(sumSquares / this.levelData.length);
   }
 
   /**
@@ -57,7 +78,8 @@ export class AudioPlayback {
 
     const source = context.createBufferSource();
     source.buffer = buffer;
-    source.connect(context.destination);
+    // Non-null: ensureContext() above always creates `analyser` together with `context`.
+    source.connect(this.analyser!);
     source.onended = () => {
       this.activeSources = this.activeSources.filter((s) => s !== source);
     };
@@ -83,7 +105,10 @@ export class AudioPlayback {
 
   stop(): void {
     this.clear();
+    this.analyser?.disconnect();
     void this.context?.close();
     this.context = null;
+    this.analyser = null;
+    this.levelData = null;
   }
 }

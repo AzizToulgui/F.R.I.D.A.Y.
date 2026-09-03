@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Conversation } from './entities/conversation.entity';
+import { Conversation, DEFAULT_CONVERSATION_TITLE } from './entities/conversation.entity';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 
@@ -15,7 +15,7 @@ export class ConversationsService {
   async create(userId: string, dto: CreateConversationDto): Promise<Conversation> {
     const conversation = this.conversationsRepository.create({
       userId,
-      title: dto.title ?? 'New conversation',
+      title: dto.title ?? DEFAULT_CONVERSATION_TITLE,
     });
     return this.conversationsRepository.save(conversation);
   }
@@ -74,5 +74,12 @@ export class ConversationsService {
   // distinct from `update`, which only applies user-supplied DTO fields.
   async saveInternal(conversation: Conversation): Promise<Conversation> {
     return this.conversationsRepository.save(conversation);
+  }
+
+  // Used only by ConversationTitlingProcessor - a plain column write, not
+  // routed through `update` since that's the user-facing DTO path and this
+  // is the model auto-titling a conversation on the user's behalf.
+  async updateTitleInternal(id: string, title: string): Promise<void> {
+    await this.conversationsRepository.update(id, { title });
   }
 }

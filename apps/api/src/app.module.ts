@@ -1,20 +1,22 @@
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { LoggerModule } from 'nestjs-pino';
-import { randomUUID } from 'node:crypto';
+import Redis from 'ioredis';
 import {
   appConfig,
   conversationConfig,
   databaseConfig,
   geminiConfig,
   jwtConfig,
+  memoryConfig,
+  ragConfig,
   redisConfig,
   throttleConfig,
   validationSchema,
 } from './config';
-import { AppConfig } from './config/app.config';
+import { RedisConfig } from './config/redis.config';
 import { ThrottleConfig } from './config/throttle.config';
 import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './redis/redis.module';
@@ -28,44 +30,29 @@ import { AIProviderModule } from './modules/ai-provider/ai-provider.module';
 import { HealthModule } from './modules/health/health.module';
 import { LiveModule } from './modules/live/live.module';
 import { ConversationEngineModule } from './modules/conversation-engine/conversation-engine.module';
+import { MemoryModule } from './modules/memory/memory.module';
+import { DocumentsModule } from './modules/documents/documents.module';
+import { RemindersModule } from './modules/reminders/reminders.module';
+import { ToolsModule } from './modules/tools/tools.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
-      load: [appConfig, databaseConfig, redisConfig, jwtConfig, throttleConfig, geminiConfig, conversationConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        redisConfig,
+        jwtConfig,
+        throttleConfig,
+        geminiConfig,
+        conversationConfig,
+        memoryConfig,
+        ragConfig,
+      ],
       validationSchema,
       validationOptions: { abortEarly: false, allowUnknown: true },
-    }),
-
-    LoggerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const app = config.get<AppConfig>('app')!;
-        const isProduction = app.environment === 'production';
-        return {
-          pinoHttp: {
-            level: app.logLevel,
-            genReqId: (req: { id?: string; headers: Record<string, unknown> }) =>
-              (req.headers['x-correlation-id'] as string) ?? randomUUID(),
-            // Never let request/response bodies or auth material hit the logs -
-            // conversation/message content especially must not leak into log aggregation.
-            redact: {
-              paths: [
-                'req.headers.authorization',
-                'req.headers.cookie',
-                'res.headers["set-cookie"]',
-                'req.body',
-                'res.body',
-              ],
-              censor: '[redacted]',
-            },
-            transport: isProduction ? undefined : { target: 'pino-pretty' },
-          },
-        };
-      },
     }),
 
     ThrottlerModule.forRootAsync({
@@ -74,6 +61,19 @@ import { ConversationEngineModule } from './modules/conversation-engine/conversa
       useFactory: (config: ConfigService) => {
         const throttle = config.get<ThrottleConfig>('throttle')!;
         return [{ ttl: throttle.ttlMs, limit: throttle.limit }];
+      },
+    }),
+
+    // A dedicated ioredis connection, not the shared REDIS_CLIENT from
+    // RedisModule - BullMQ requires maxRetriesPerRequest: null on whatever
+    // connection it's given, which isn't a setting rate-limit/health-check
+    // usage of REDIS_CLIENT should also have to carry.
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const redis = config.get<RedisConfig>('redis')!;
+        return { connection: new Redis(redis.url, { maxRetriesPerRequest: null }) };
       },
     }),
 
@@ -87,6 +87,10 @@ import { ConversationEngineModule } from './modules/conversation-engine/conversa
     MessagesModule,
     LiveModule,
     ConversationEngineModule,
+    MemoryModule,
+    RemindersModule,
+    ToolsModule,
+    DocumentsModule,
   ],
   providers: [
     // Order matters: rate limiting rejects abusive traffic before it ever

@@ -1,6 +1,13 @@
 import { GoogleGenAI, Modality } from '@google/genai';
 import type { LiveServerMessage, Session } from '@google/genai';
-import type { LiveClientCallbacks, LiveConnectionState, LiveSessionTokenResponse, LiveTurnEvent } from './types';
+import type {
+  LiveClientCallbacks,
+  LiveConnectionState,
+  LiveFunctionCall,
+  LiveFunctionResponse,
+  LiveSessionTokenResponse,
+  LiveTurnEvent,
+} from './types';
 
 const CONNECT_TIMEOUT_MS = 10_000;
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -32,12 +39,18 @@ function backoffDelay(attempt: number): number {
  * connection state, and reconnecting (with a resumed session where possible)
  * on drops - without losing the caller's place in the conversation.
  *
- * Deliberately does not touch memory, RAG, tools, or turn-taking policy -
- * this is the transport layer only (see Step 4 scope in ARCHITECTURE.md).
+ * Deliberately does not touch memory or RAG - this is the transport layer
+ * (see Step 4 scope in ARCHITECTURE.md). Tool calls are the one exception
+ * (Section 3's "tool calling relay"): this class is just a dumb relay for
+ * them too - it never decides whether a tool is allowed to run, it forwards
+ * the request to `executeToolCalls` (backed by the authenticated
+ * POST /tools/:name/invoke endpoint) and relays the result back into the
+ * session, exactly as a `sendRealtimeInput`/audio chunk would be relayed.
  */
 export class LiveClient {
   private readonly getToken: () => Promise<LiveSessionTokenResponse>;
   private readonly callbacks: LiveClientCallbacks;
+  private readonly executeToolCalls?: (calls: LiveFunctionCall[]) => Promise<LiveFunctionResponse[]>;
 
   private state: LiveConnectionState = 'idle';
   private session: Session | null = null;
@@ -54,9 +67,14 @@ export class LiveClient {
   private lastUserSpeechAt: number | null = null;
   private awaitingFirstAudioOfTurn = true;
 
-  constructor(options: { getToken: () => Promise<LiveSessionTokenResponse>; callbacks: LiveClientCallbacks }) {
+  constructor(options: {
+    getToken: () => Promise<LiveSessionTokenResponse>;
+    callbacks: LiveClientCallbacks;
+    executeToolCalls?: (calls: LiveFunctionCall[]) => Promise<LiveFunctionResponse[]>;
+  }) {
     this.getToken = options.getToken;
     this.callbacks = options.callbacks;
+    this.executeToolCalls = options.executeToolCalls;
   }
 
   getState(): LiveConnectionState {
@@ -180,6 +198,13 @@ export class LiveClient {
       this.callbacks.onStatus?.('Server is ending this session soon; will reconnect automatically.');
     }
 
+    if (message.toolCall?.functionCalls?.length) {
+      const calls: LiveFunctionCall[] = message.toolCall.functionCalls
+        .filter((call): call is typeof call & { name: string } => Boolean(call.name))
+        .map((call) => ({ name: call.name, args: call.args ?? {}, id: call.id }));
+      if (calls.length > 0) this.handleToolCall(seq, calls);
+    }
+
     const content = message.serverContent;
     if (!content && !message.data) return;
 
@@ -208,6 +233,52 @@ export class LiveClient {
       inputText: content?.inputTranscription?.text ?? undefined,
     };
     this.callbacks.onTurn?.(event);
+  }
+
+  /**
+   * Relays a Gemini-requested tool call to the backend and the result back
+   * into the session - fire-and-forget from handleMessage's perspective
+   * (the Live protocol doesn't block on this either; Gemini just waits for
+   * the matching sendToolResponse before continuing that turn).
+   */
+  private handleToolCall(seq: number, calls: LiveFunctionCall[]): void {
+    if (!this.executeToolCalls) {
+      // No relay wired up (e.g. this session was opened without tool
+      // support) - tell Gemini every call failed rather than hanging it.
+      this.session?.sendToolResponse({
+        functionResponses: calls.map((call) => ({
+          id: call.id,
+          name: call.name,
+          response: { error: 'Tool calling is not available in this session.' },
+        })),
+      });
+      return;
+    }
+
+    void this.executeToolCalls(calls)
+      .then((responses) => {
+        if (seq !== this.connectSeq || !this.session) return;
+        this.session.sendToolResponse({
+          functionResponses: responses.map((response) => ({
+            id: response.id,
+            name: response.name,
+            response: response.response,
+          })),
+        });
+      })
+      .catch((error) => {
+        if (seq !== this.connectSeq || !this.session) return;
+        this.callbacks.onStatus?.(
+          `Tool call failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
+        this.session.sendToolResponse({
+          functionResponses: calls.map((call) => ({
+            id: call.id,
+            name: call.name,
+            response: { error: 'Tool execution failed.' },
+          })),
+        });
+      });
   }
 
   private handleClose(seq: number, reason: string): void {

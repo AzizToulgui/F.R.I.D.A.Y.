@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Orb } from './Orb';
 import { useLiveSession } from '@/lib/live/useLiveSession';
 import type { OrbMode, Theme } from '@/types';
@@ -33,8 +33,11 @@ export function VoiceOverlay({ theme, onClose }: VoiceOverlayProps) {
     toggleMuted,
     start,
     stop,
+    getMicLevel,
+    getOutputLevel,
   } = useLiveSession();
   const [transcriptOn, setTranscriptOn] = useState(true);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void start();
@@ -42,6 +45,35 @@ export function VoiceOverlay({ theme, onClose }: VoiceOverlayProps) {
     // Connect exactly once when the overlay mounts, disconnect on unmount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Without this, focus stays on whatever button opened the overlay (still
+  // in the DOM underneath it, just visually covered) - the Space shortcut
+  // below deliberately no-ops while focus sits on a button, so the very
+  // first press right after opening would otherwise silently do nothing.
+  useEffect(() => {
+    rootRef.current?.focus();
+  }, []);
+
+  // Escape ends the session (same as the End button); Space toggles mute -
+  // both skipped while the browser's own focus is on an interactive element
+  // that would normally consume the key (e.g. the Transcript button), so a
+  // stray Enter/Space activating a button doesn't also toggle the mic.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      const target = e.target as HTMLElement | null;
+      const isInteractive = target?.tagName === 'BUTTON' || target?.tagName === 'INPUT';
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === ' ' && !isInteractive) {
+        e.preventDefault();
+        toggleMuted();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose, toggleMuted]);
 
   const orbMode: OrbMode =
     state === 'error'
@@ -65,7 +97,11 @@ export function VoiceOverlay({ theme, onClose }: VoiceOverlayProps) {
         : defaultSub;
 
   return (
-    <div className="absolute inset-0 z-50 flex animate-[jv-rise_0.2s_ease-out] flex-col [background:radial-gradient(900px_620px_at_50%_42%,var(--ac-xs),transparent_70%),var(--bg-voice)]">
+    <div
+      ref={rootRef}
+      tabIndex={-1}
+      className="absolute inset-0 z-50 flex animate-[jv-rise_0.2s_ease-out] flex-col outline-none [background:radial-gradient(900px_620px_at_50%_42%,var(--ac-xs),transparent_70%),var(--bg-voice)]"
+    >
       <div className="relative flex h-14 flex-none items-center justify-center">
         <div className="font-mono text-[10.5px] tracking-[0.34em] text-tx4">JARVIS</div>
         <button
@@ -80,7 +116,12 @@ export function VoiceOverlay({ theme, onClose }: VoiceOverlayProps) {
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 overflow-hidden p-2.5">
         <div className="grid min-h-0 w-full flex-1 place-items-center">
-          <Orb mode={orbMode} isLight={theme === 'light'} size="voice" />
+          <Orb
+            mode={orbMode}
+            isLight={theme === 'light'}
+            size="voice"
+            getLevel={orbMode === 'speaking' ? getOutputLevel : orbMode === 'listening' ? getMicLevel : undefined}
+          />
         </div>
         <div role="status" aria-live="polite" className="flex-none text-[17px] tracking-[0.01em] text-tx">
           {label}
@@ -140,6 +181,9 @@ export function VoiceOverlay({ theme, onClose }: VoiceOverlayProps) {
         >
           End
         </button>
+      </div>
+      <div className="flex-none pb-3 text-center font-mono text-[10px] tracking-[0.14em] text-tx5">
+        SPACE TO MUTE · ESC TO END
       </div>
     </div>
   );
