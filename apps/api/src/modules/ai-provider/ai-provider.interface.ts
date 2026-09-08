@@ -4,6 +4,8 @@ import {
   GenerateTextParams,
   GenerateTextResult,
   LiveSessionToken,
+  LiveVoiceOptions,
+  SpeechSample,
   ToolDeclaration,
 } from './ai-provider.types';
 
@@ -31,8 +33,13 @@ export abstract class AIProvider {
 
   // Mints a short-lived credential the browser can use to open a Gemini Live
   // WebSocket directly (see ARCHITECTURE.md Section 3) - the permanent API
-  // key never leaves this method's implementation. `tools`, if given, are
-  // locked into the session's config server-side (a Live session has no
-  // per-turn config the client can attach tools to after connecting).
-  abstract mintLiveSessionToken(tools?: ToolDeclaration[]): Promise<LiveSessionToken>;
+  // key never leaves this method's implementation. `tools` and `voice`, if
+  // given, are locked into the session's config server-side (a Live session
+  // has no per-turn config the client can attach tools to, or restyle the
+  // voice on, after connecting).
+  abstract mintLiveSessionToken(tools?: ToolDeclaration[], voice?: LiveVoiceOptions): Promise<LiveSessionToken>;
+
+  // One-shot (non-Live) speech synthesis - used to preview a prebuilt voice
+  // before picking it (see VoiceSamplesService), not for live conversation.
+  abstract synthesizeSpeech(text: string, voiceName: string): Promise<SpeechSample>;
 }

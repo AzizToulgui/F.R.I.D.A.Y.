@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -38,6 +38,21 @@ export class UsersService {
       passwordHash: params.passwordHash,
       displayName: params.displayName,
     });
+    return this.usersRepository.save(user);
+  }
+
+  // `undefined` fields are left untouched (partial update); pass `null`
+  // explicitly to clear a preference back to Gemini's default.
+  async updateVoiceSettings(
+    userId: string,
+    updates: { voiceName?: string | null; voiceDeliveryStyle?: string | null },
+  ): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    if (updates.voiceName !== undefined) user.voiceName = updates.voiceName;
+    if (updates.voiceDeliveryStyle !== undefined) user.voiceDeliveryStyle = updates.voiceDeliveryStyle;
     return this.usersRepository.save(user);
   }
 }

@@ -60,7 +60,7 @@ export class TurnsController {
       reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
 
-    const stream = this.engine.streamTurn(conversation, dto.content);
+    const stream = this.engine.streamTurn(conversation, dto.content, dto.timezone);
     try {
       while (true) {
         const step = await stream.next();

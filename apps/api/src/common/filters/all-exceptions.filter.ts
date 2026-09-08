@@ -47,7 +47,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
-    response.status(status).send(body);
+    // This filter talks to Fastify directly (not through Nest's httpAdapter),
+    // so it doesn't get Nest's own "Content-Type doesn't match Reply body"
+    // auto-correction - a route that sets a non-JSON Content-Type (e.g. a
+    // binary response like GET .../sample) would otherwise leave that header
+    // in place for this JSON error body too, and Fastify refuses to
+    // serialize a plain object under a non-JSON Content-Type at all,
+    // masking the real error behind a confusing "invalid payload type" 500.
+    response.header('Content-Type', 'application/json; charset=utf-8').status(status).send(body);
   }
 
   private resolve(exception: unknown): {

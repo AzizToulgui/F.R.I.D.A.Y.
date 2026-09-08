@@ -32,6 +32,7 @@ import { LiveModule } from './modules/live/live.module';
 import { ConversationEngineModule } from './modules/conversation-engine/conversation-engine.module';
 import { MemoryModule } from './modules/memory/memory.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { NotesModule } from './modules/notes/notes.module';
 import { RemindersModule } from './modules/reminders/reminders.module';
 import { ToolsModule } from './modules/tools/tools.module';
 
@@ -89,6 +90,7 @@ import { ToolsModule } from './modules/tools/tools.module';
     ConversationEngineModule,
     MemoryModule,
     RemindersModule,
+    NotesModule,
     ToolsModule,
     DocumentsModule,
   ],

@@ -65,9 +65,13 @@ export class ConversationEngineService {
    * stream so callers get both the text deltas and (via the generator's
    * return value) the final TurnResult without buffering the whole reply.
    */
-  async *streamTurn(conversation: Conversation, content: string): AsyncGenerator<string, TurnResult, void> {
+  async *streamTurn(
+    conversation: Conversation,
+    content: string,
+    timezone?: string,
+  ): AsyncGenerator<string, TurnResult, void> {
     await this.recordUserMessage(conversation.id, content);
-    const context = await this.buildTurnContext(conversation, content);
+    const context = await this.buildTurnContext(conversation, content, timezone);
     const tools = this.toolRegistry.getDeclarations();
 
     let messages = context.messages;
@@ -116,7 +120,15 @@ export class ConversationEngineService {
     // after a manual rename beats it to the punch).
     if (conversation.title === DEFAULT_CONVERSATION_TITLE) {
       try {
-        await this.titlingQueue.add('title', { conversationId: conversation.id, userId: conversation.userId });
+        await this.titlingQueue.add(
+          'title',
+          { conversationId: conversation.id, userId: conversation.userId },
+          // Transient Gemini errors (rate limits, brief 5xx) are common enough
+          // in practice (observed 30s+ SDK-internal retry stalls) that a single
+          // attempt isn't reliable - let BullMQ retry with backoff instead of
+          // depending on the user sending another message to re-trigger this.
+          { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
+        );
       } catch (error) {
         this.logger.warn('Failed to enqueue conversation titling job', error instanceof Error ? error.stack : error);
       }
@@ -148,7 +160,11 @@ export class ConversationEngineService {
    * summary instead of being resent, so cost and prompt size stay bounded on
    * long conversations instead of growing without limit.
    */
-  private async buildTurnContext(conversation: Conversation, latestUserContent: string): Promise<TurnContext> {
+  private async buildTurnContext(
+    conversation: Conversation,
+    latestUserContent: string,
+    timezone?: string,
+  ): Promise<TurnContext> {
     const relevantMemories = await this.retrieveRelevantMemories(conversation.userId, latestUserContent);
     const relevantChunks = await this.retrieveRelevantDocumentChunks(conversation.userId, latestUserContent);
     const allMessages = await this.messagesService.findAllForConversation(conversation.userId, conversation.id);
@@ -163,6 +179,7 @@ export class ConversationEngineService {
           conversation.customInstructions,
           relevantMemories,
           relevantChunks,
+          timezone,
         ),
         messages: [],
       };
@@ -204,6 +221,7 @@ export class ConversationEngineService {
         conversation.customInstructions,
         relevantMemories,
         relevantChunks,
+        timezone,
       ),
       messages: recent
         .filter((m) => m.role === MessageRole.USER || m.role === MessageRole.ASSISTANT)
@@ -216,8 +234,11 @@ export class ConversationEngineService {
     customInstructions: string | null,
     relevantMemories: string[],
     relevantChunks: RetrievedChunk[],
+    timezone?: string,
   ): string {
     const parts = [JARVIS_TEXT_SYSTEM_PROMPT];
+    const timezoneNote = this.describeTimezone(timezone);
+    if (timezoneNote) parts.push(timezoneNote);
     if (relevantMemories.length > 0) {
       parts.push(
         `Things you remember about this user from past conversations (for your context only - do not repeat them verbatim unless relevant):\n${relevantMemories.map((m) => `- ${m}`).join('\n')}`,
@@ -243,6 +264,29 @@ export class ConversationEngineService {
       parts.push(`The user has asked you to follow these instructions for this conversation:\n${customInstructions}`);
     }
     return parts.join('\n\n');
+  }
+
+  // Without this, the model has no way to know what "11:30" or "tomorrow"
+  // means in absolute terms and silently falls back toward UTC - correct in
+  // the reply text (it just echoes the words back) but wrong in anything
+  // that stores an actual instant, like create_reminder's dueAt, which then
+  // renders shifted once the frontend converts it to the user's real local
+  // time. `timezone` comes from the client (see CreateTurnDto) reading
+  // Intl.DateTimeFormat().resolvedOptions().timeZone - best-effort, so an
+  // absent or invalid value just omits this note rather than failing the turn.
+  private describeTimezone(timezone?: string): string | null {
+    if (!timezone) return null;
+    let localNow: string;
+    try {
+      localNow = new Intl.DateTimeFormat('en-US', {
+        dateStyle: 'full',
+        timeStyle: 'short',
+        timeZone: timezone,
+      }).format(new Date());
+    } catch {
+      return null;
+    }
+    return `The user's current local timezone is ${timezone} (right now it's ${localNow} there). When the user gives a time or date without specifying a timezone, assume this one - pass it explicitly to get_current_time, and compute any absolute date-time you produce (such as create_reminder's dueAt) using this timezone's offset, not UTC.`;
   }
 
   // Best-effort: a slow/failed retrieval degrades to "no memories this turn"

@@ -9,6 +9,7 @@ import { Message } from '../modules/messages/entities/message.entity';
 import { Memory } from '../modules/memory/entities/memory.entity';
 import { DocumentChunk } from '../modules/documents/entities/document-chunk.entity';
 import { Document } from '../modules/documents/entities/document.entity';
+import { Note } from '../modules/notes/entities/note.entity';
 import { Reminder } from '../modules/reminders/entities/reminder.entity';
 import { ToolInvocation } from '../modules/tools/entities/tool-invocation.entity';
 
@@ -33,6 +34,7 @@ import { ToolInvocation } from '../modules/tools/entities/tool-invocation.entity
             Message,
             Memory,
             Reminder,
+            Note,
             ToolInvocation,
             Document,
             DocumentChunk,

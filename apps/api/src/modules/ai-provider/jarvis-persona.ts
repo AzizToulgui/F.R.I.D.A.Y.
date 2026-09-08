@@ -18,6 +18,13 @@ export const JARVIS_TEXT_SYSTEM_PROMPT = `${JARVIS_CORE_PERSONA}
 
 // Locked into the ephemeral Live token server-side (see GeminiProvider.mintLiveSessionToken)
 // rather than sent per-message, since a Live session has no per-turn system
-// instruction - this is set once for the whole session.
-export const JARVIS_VOICE_SYSTEM_PROMPT = `${JARVIS_CORE_PERSONA}
-- This is a spoken, real-time conversation - reply the way a person would speak aloud. Never use markdown, headers, bullet lists, or code blocks; spell out anything that would normally be a symbol or visual formatting.`;
+// instruction - this is set once for the whole session. `deliveryStyleInstruction`
+// comes from the user's chosen VoiceDeliveryStyleOption (see voice-options.ts) -
+// undefined just falls back to the same calm-and-natural default the app
+// shipped with before delivery style became user-configurable.
+export function buildVoiceSystemPrompt(deliveryStyleInstruction?: string): string {
+  const style = deliveryStyleInstruction ?? 'Calm, measured, and naturally paced.';
+  return `${JARVIS_CORE_PERSONA}
+- This is a spoken, real-time conversation - reply the way a person would speak aloud. Never use markdown, headers, bullet lists, or code blocks; spell out anything that would normally be a symbol or visual formatting.
+- Delivery style: ${style}`;
+}

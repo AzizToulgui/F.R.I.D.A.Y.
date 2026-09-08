@@ -348,7 +348,11 @@ describe('ConversationEngineService', () => {
     const conversation = makeConversation({ title: DEFAULT_CONVERSATION_TITLE });
     await drain(service.streamTurn(conversation, 'hello'));
 
-    expect(titlingQueue.add).toHaveBeenCalledWith('title', { conversationId: 'conv-1', userId: 'user-1' });
+    expect(titlingQueue.add).toHaveBeenCalledWith(
+      'title',
+      { conversationId: 'conv-1', userId: 'user-1' },
+      { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
+    );
   });
 
   it('does not enqueue a titling job once the conversation already has a real title', async () => {

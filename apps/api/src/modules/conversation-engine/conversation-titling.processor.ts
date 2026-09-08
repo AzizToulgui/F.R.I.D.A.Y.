@@ -59,10 +59,13 @@ export class ConversationTitlingProcessor extends WorkerHost {
       title = this.sanitize(result.content);
     } catch (error) {
       this.logger.warn(
-        `Title generation failed for conversation ${conversationId} - will retry on the next turn`,
+        `Title generation failed for conversation ${conversationId} - will retry via BullMQ`,
         error instanceof Error ? error.stack : error,
       );
-      return;
+      // Rethrow (rather than swallow) so BullMQ's own retry/backoff picks this
+      // up - a transient Gemini error otherwise went silent forever unless the
+      // user happened to send another message in this same conversation.
+      throw error;
     }
     if (!title) return;
 

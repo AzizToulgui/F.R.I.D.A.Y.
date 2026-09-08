@@ -30,7 +30,8 @@ export class CreateReminderTool implements ToolDefinition<Params> {
       text: { type: 'string', description: 'What to remind the user about.' },
       dueAt: {
         type: 'string',
-        description: 'ISO 8601 date-time the reminder is due, if the user gave or implied one.',
+        description:
+          "ISO 8601 date-time the reminder is due, if the user gave or implied one. Must include an explicit UTC offset (e.g. '2026-09-04T11:30:00+01:00') or 'Z' for UTC - never emit a timezone-less date-time. If the user didn't specify a timezone, use the one given in your system instructions, not UTC.",
       },
     },
     required: ['text'],

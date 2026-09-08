@@ -7,6 +7,13 @@ export interface FunctionCallRequest {
   name: string;
   args: Record<string, unknown>;
   id?: string;
+  // Gemini-specific: an opaque token tied to the model's reasoning for this
+  // call. Thinking-enabled models (see GeminiProvider.thinkingConfigFor)
+  // reject a replayed functionCall part that doesn't carry back the same
+  // signature it was originally issued with (400 INVALID_ARGUMENT) - so this
+  // has to survive the round-trip from provider response to the next
+  // request's history, not just get dropped as provider-specific noise.
+  thoughtSignature?: string;
 }
 
 // The result of executing a FunctionCallRequest, sent back to the model as
@@ -67,6 +74,25 @@ export interface CountTokensParams {
 
 export interface EmbeddingResult {
   vector: number[];
+}
+
+// The user's saved voice preferences (see users.entity.ts), already resolved
+// to what the provider needs - LiveController passes the raw voiceName
+// through and looks up deliveryStyleInstruction via
+// voice-options.deliveryStyleInstructionFor before calling mintLiveSessionToken,
+// so GeminiProvider doesn't need to know about the preset key scheme at all.
+export interface LiveVoiceOptions {
+  voiceName?: string;
+  deliveryStyleInstruction?: string;
+}
+
+// A single synthesized audio clip (see AIProvider.synthesizeSpeech) - raw
+// PCM, not yet wrapped in a container format. `sampleRateHz` is parsed from
+// whatever the provider's response actually reports rather than assumed, so
+// a future model returning a different rate doesn't silently mis-decode.
+export interface SpeechSample {
+  audioBase64: string;
+  sampleRateHz: number;
 }
 
 export interface LiveSessionToken {

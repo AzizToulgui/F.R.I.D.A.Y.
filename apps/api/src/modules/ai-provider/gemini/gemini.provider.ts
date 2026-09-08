@@ -1,7 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Content, GoogleGenAI, Modality, ThinkingLevel } from '@google/genai';
-import type { FunctionCall, GenerateContentResponseUsageMetadata, Part, Tool } from '@google/genai';
+import type { GenerateContentResponse, GenerateContentResponseUsageMetadata, Part, Tool } from '@google/genai';
 import { GeminiConfig } from '../../../config/gemini.config';
 import { AIProvider } from '../ai-provider.interface';
 import {
@@ -12,10 +12,12 @@ import {
   GenerateTextParams,
   GenerateTextResult,
   LiveSessionToken,
+  LiveVoiceOptions,
+  SpeechSample,
   TokenUsage,
   ToolDeclaration,
 } from '../ai-provider.types';
-import { JARVIS_VOICE_SYSTEM_PROMPT } from '../jarvis-persona';
+import { buildVoiceSystemPrompt } from '../jarvis-persona';
 
 // Ephemeral auth tokens are a Gemini Developer API feature and, per the SDK,
 // only available on the v1alpha surface - stable APIs (text/embeddings, once
@@ -56,13 +58,29 @@ function toContents(messages: ChatMessage[]): Content[] {
       const parts: Part[] = [];
       if (message.content) parts.push({ text: message.content });
       for (const call of message.functionCalls ?? []) {
-        parts.push({ functionCall: { name: call.name, args: call.args, id: call.id } });
+        parts.push({
+          functionCall: { name: call.name, args: call.args, id: call.id },
+          // Must be replayed on the exact part that carried it, or a
+          // thinking-enabled model 400s on the next round - see
+          // FunctionCallRequest.thoughtSignature.
+          thoughtSignature: call.thoughtSignature,
+        });
       }
       for (const response of message.functionResponses ?? []) {
         parts.push({ functionResponse: { name: response.name, response: response.response, id: response.id } });
       }
       return { role: message.role === 'model' ? 'model' : 'user', parts };
     });
+}
+
+const DEFAULT_TTS_SAMPLE_RATE_HZ = 24000;
+
+// Gemini's TTS response reports its PCM rate in the part's mimeType (e.g.
+// "audio/L16;codec=pcm;rate=24000") rather than as a structured field -
+// falls back to the documented default if that ever changes shape.
+function parseSampleRateHz(mimeType?: string): number {
+  const match = mimeType?.match(/rate=(\d+)/);
+  return match ? Number(match[1]) : DEFAULT_TTS_SAMPLE_RATE_HZ;
 }
 
 function toUsage(usage?: GenerateContentResponseUsageMetadata): TokenUsage {
@@ -88,9 +106,20 @@ function toGeminiTools(tools?: ToolDeclaration[]): Tool[] | undefined {
   ];
 }
 
-function toFunctionCallRequests(calls?: FunctionCall[]): FunctionCallRequest[] | undefined {
-  if (!calls?.length) return undefined;
-  return calls.map((call) => ({ name: call.name ?? '', args: call.args ?? {}, id: call.id }));
+// Deliberately reads parts directly instead of the SDK's `response.functionCalls`
+// convenience getter, which flattens out `part.thoughtSignature` - see
+// FunctionCallRequest.thoughtSignature for why that can't be dropped.
+function extractFunctionCalls(response: GenerateContentResponse): FunctionCallRequest[] | undefined {
+  const parts = response.candidates?.[0]?.content?.parts;
+  const calls = parts
+    ?.filter((part) => part.functionCall)
+    .map((part) => ({
+      name: part.functionCall!.name ?? '',
+      args: part.functionCall!.args ?? {},
+      id: part.functionCall!.id,
+      thoughtSignature: part.thoughtSignature,
+    }));
+  return calls?.length ? calls : undefined;
 }
 
 // Concrete Gemini implementation of AIProvider. Live session token minting
@@ -140,7 +169,7 @@ export class GeminiProvider extends AIProvider {
       return {
         content: response.text ?? '',
         usage: toUsage(response.usageMetadata),
-        functionCalls: toFunctionCallRequests(response.functionCalls),
+        functionCalls: extractFunctionCalls(response),
       };
     } catch (error) {
       this.logger.error('Gemini generateText failed', error instanceof Error ? error.stack : error);
@@ -150,11 +179,7 @@ export class GeminiProvider extends AIProvider {
 
   async *generateTextStream(params: GenerateTextParams): AsyncGenerator<string, GenerateTextResult, void> {
     const ai = this.stableClient();
-    let stream: AsyncGenerator<{
-      text?: string;
-      usageMetadata?: GenerateContentResponseUsageMetadata;
-      functionCalls?: FunctionCall[];
-    }>;
+    let stream: AsyncGenerator<GenerateContentResponse>;
     try {
       stream = await ai.models.generateContentStream({
         model: params.model ?? this.config.textModel,
@@ -183,7 +208,8 @@ export class GeminiProvider extends AIProvider {
           yield chunk.text;
         }
         if (chunk.usageMetadata) usage = toUsage(chunk.usageMetadata);
-        if (chunk.functionCalls?.length) functionCalls = toFunctionCallRequests(chunk.functionCalls);
+        const chunkCalls = extractFunctionCalls(chunk);
+        if (chunkCalls) functionCalls = chunkCalls;
       }
     } catch (error) {
       this.logger.error('Gemini generateTextStream failed mid-stream', error instanceof Error ? error.stack : error);
@@ -228,7 +254,34 @@ export class GeminiProvider extends AIProvider {
     }
   }
 
-  async mintLiveSessionToken(tools?: ToolDeclaration[]): Promise<LiveSessionToken> {
+  async synthesizeSpeech(text: string, voiceName: string): Promise<SpeechSample> {
+    const ai = this.stableClient();
+    try {
+      const response = await ai.models.generateContent({
+        model: this.config.ttsModel,
+        // A bare sentence (e.g. "Hi, I'm JARVIS.") reads as a conversational
+        // prompt - the TTS model tried to reply to it with text instead of
+        // just speaking it (400 INVALID_ARGUMENT: "Model tried to generate
+        // text, but it should only be used for TTS"). This framing forces
+        // it to treat `text` as a literal transcript to vocalize.
+        contents: [{ role: 'user', parts: [{ text: `Say exactly the following and nothing else: ${text}` }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+        },
+      });
+      const inline = response.candidates?.[0]?.content?.parts?.find((part) => part.inlineData)?.inlineData;
+      if (!inline?.data) {
+        throw new Error('Gemini returned no audio data.');
+      }
+      return { audioBase64: inline.data, sampleRateHz: parseSampleRateHz(inline.mimeType) };
+    } catch (error) {
+      this.logger.error('Gemini synthesizeSpeech failed', error instanceof Error ? error.stack : error);
+      throw new ServiceUnavailableException('Could not generate a voice sample right now.');
+    }
+  }
+
+  async mintLiveSessionToken(tools?: ToolDeclaration[], voice?: LiveVoiceOptions): Promise<LiveSessionToken> {
     if (!this.config.apiKey) {
       throw new ServiceUnavailableException('Live voice sessions are not configured on this server.');
     }
@@ -263,8 +316,14 @@ export class GeminiProvider extends AIProvider {
               // A Live session has no per-turn system instruction like text
               // generation does, so JARVIS's identity/multilingual behavior
               // has to be locked in here, once, for the whole session.
-              systemInstruction: JARVIS_VOICE_SYSTEM_PROMPT,
+              systemInstruction: buildVoiceSystemPrompt(voice?.deliveryStyleInstruction),
               tools: toGeminiTools(tools),
+              // Omitted entirely (not sent as undefined) when the user hasn't
+              // picked one, so Gemini falls back to its own default voice
+              // rather than erroring on a malformed speechConfig.
+              ...(voice?.voiceName
+                ? { speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice.voiceName } } } }
+                : {}),
             },
           },
         },

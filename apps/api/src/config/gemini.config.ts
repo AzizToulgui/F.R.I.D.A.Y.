@@ -4,6 +4,7 @@ export interface GeminiConfig {
   apiKey: string;
   textModel: string;
   liveModel: string;
+  ttsModel: string;
   embeddingModel: string;
   embeddingDimensions: number;
 }
@@ -19,6 +20,13 @@ export const geminiConfig = registerAs(
     // identical deprecation note in memory.config.ts / conversation.config.ts).
     textModel: process.env.GEMINI_TEXT_MODEL ?? 'gemini-3.6-flash',
     liveModel: process.env.GEMINI_LIVE_MODEL ?? 'gemini-2.5-flash-native-audio-latest',
+    // Separate from liveModel - Live sessions are a WebSocket protocol this
+    // model doesn't speak; this is the one-shot generateContent model for a
+    // single synthesized clip (used to preview a prebuilt voice before
+    // picking it - see VoiceSamplesService). Verified empirically against
+    // this project's API key: none of the gemini-3.x names support
+    // generateContent with an AUDIO response modality yet, only this one.
+    ttsModel: process.env.GEMINI_TTS_MODEL ?? 'gemini-2.5-flash-preview-tts',
     embeddingModel: process.env.GEMINI_EMBEDDING_MODEL ?? 'gemini-embedding-001',
     // Gemini's embedding model supports Matryoshka truncation down to smaller
     // sizes via outputDimensionality - fixed here (not left at the model's

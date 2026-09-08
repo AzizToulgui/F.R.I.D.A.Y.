@@ -23,6 +23,16 @@ export class User extends BaseEntity {
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive!: boolean;
 
+  // Both null until the user picks something in Settings > Voice - see
+  // voice-options.ts for the fixed roster/preset keys these are validated
+  // against, and LiveController for where they get resolved into an actual
+  // Live session config.
+  @Column({ name: 'voice_name', type: 'varchar', length: 64, nullable: true })
+  voiceName!: string | null;
+
+  @Column({ name: 'voice_delivery_style', type: 'varchar', length: 64, nullable: true })
+  voiceDeliveryStyle!: string | null;
+
   @OneToMany(() => RefreshToken, (token) => token.user)
   refreshTokens?: RefreshToken[];
 
