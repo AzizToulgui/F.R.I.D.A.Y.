@@ -13,7 +13,7 @@ import { ToolExecutionService } from '../tools/tool-execution.service';
 import { ToolRegistryService } from '../tools/tool-registry.service';
 import { CONVERSATION_TITLING_QUEUE } from './conversation-titling.queue';
 import { ConversationEngineService } from './conversation-engine.service';
-import { JARVIS_TEXT_SYSTEM_PROMPT } from '../ai-provider/jarvis-persona';
+import { FRIDAY_TEXT_SYSTEM_PROMPT } from '../ai-provider/friday-persona';
 
 async function* fakeStream(deltas: string[], result: GenerateTextResult) {
   for (const delta of deltas) yield delta;
@@ -182,7 +182,7 @@ describe('ConversationEngineService', () => {
     );
 
     const streamCall = aiProvider.generateTextStream.mock.calls[0][0];
-    expect(streamCall.systemInstruction).toBe(JARVIS_TEXT_SYSTEM_PROMPT);
+    expect(streamCall.systemInstruction).toBe(FRIDAY_TEXT_SYSTEM_PROMPT);
     expect(streamCall.messages).toEqual([{ role: 'user', content: 'Hello' }]);
   });
 

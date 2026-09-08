@@ -97,7 +97,7 @@ export function KnowledgeView() {
           <div className="min-w-[260px] flex-1">
             <h1 className="m-0 text-[26px] font-normal text-foreground">Knowledge</h1>
             <p className="mt-2 max-w-[50ch] text-sm leading-[1.65] text-muted-foreground">
-              Documents JARVIS can retrieve from during conversations. Answers cite the document (and section) they
+              Documents FRIDAY can retrieve from during conversations. Answers cite the document (and section) they
               came from.
             </p>
           </div>

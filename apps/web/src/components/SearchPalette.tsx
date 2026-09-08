@@ -11,7 +11,7 @@ interface SearchPaletteProps {
 
 export function SearchPalette({ onClose, onNavigate }: SearchPaletteProps) {
   return (
-    <CommandDialog open onOpenChange={(open) => !open && onClose()} title="Search JARVIS">
+    <CommandDialog open onOpenChange={(open) => !open && onClose()} title="Search FRIDAY">
       {/* CommandDialog only supplies the Dialog chrome - the cmdk store
           context (which CommandInput/CommandList/CommandItem all subscribe
           to) comes from Command itself, so it has to wrap them explicitly. */}

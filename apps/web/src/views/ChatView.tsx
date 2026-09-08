@@ -168,7 +168,7 @@ function ShareDialog({
     onClose();
   };
 
-  const emailHref = `mailto:?subject=${encodeURIComponent('A message from JARVIS')}&body=${encodeURIComponent(text)}`;
+  const emailHref = `mailto:?subject=${encodeURIComponent('A message from FRIDAY')}&body=${encodeURIComponent(text)}`;
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -552,7 +552,7 @@ export function ChatView({
             streaming={streaming}
           />
           <div className="mt-2.5 text-center text-[11px] text-muted-foreground">
-            JARVIS can make mistakes. Verify important details.
+            FRIDAY can make mistakes. Verify important details.
           </div>
         </div>
       </div>

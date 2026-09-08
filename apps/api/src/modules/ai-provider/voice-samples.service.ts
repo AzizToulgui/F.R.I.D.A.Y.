@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import { AIProvider } from "./ai-provider.interface";
 
 // Fixed, short, and deliberately generic - the point is to hear the
-// timbre/pacing of the voice itself, not JARVIS's persona or branding
+// timbre/pacing of the voice itself, not FRIDAY's persona or branding
 // (matches the style of Google's own TTS examples, e.g. "Say cheerfully:
 // Have a wonderful day!" - a neutral line, not tied to any assistant).
 const SAMPLE_TEXT ="Hello! I'm your AI assistant. I can help you find information, organize your day, and get things done.";

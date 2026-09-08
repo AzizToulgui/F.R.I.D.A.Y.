@@ -21,8 +21,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'JARVIS',
-  description: 'JARVIS - a Gemini-powered conversational assistant',
+  title: 'FRIDAY',
+  description: 'FRIDAY - a Gemini-powered conversational assistant',
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

@@ -45,7 +45,7 @@ export class Conversation extends BaseEntity {
 
   // User-supplied instructions scoped to this conversation (e.g. "reply in
   // French", "keep answers under two sentences") - folded into the system
-  // instruction alongside the fixed JARVIS persona on every turn.
+  // instruction alongside the fixed FRIDAY persona on every turn.
   @Column({ name: 'custom_instructions', type: 'text', nullable: true })
   customInstructions!: string | null;
 

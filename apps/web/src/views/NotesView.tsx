@@ -38,7 +38,7 @@ export function NotesView() {
       <div className="mx-auto max-w-[860px] px-6 pt-[38px] pb-[60px]">
         <h1 className="m-0 text-[26px] font-normal text-foreground">Notes</h1>
         <p className="mt-2 mb-[22px] max-w-[52ch] text-sm leading-[1.65] text-muted-foreground">
-          Ask JARVIS, in chat or voice, to save a note and it&rsquo;ll show up here.
+          Ask FRIDAY, in chat or voice, to save a note and it&rsquo;ll show up here.
         </p>
 
         {error && <div className="mb-3 text-[13px] text-destructive">{error}</div>}
@@ -47,7 +47,7 @@ export function NotesView() {
           <div className="text-[13.5px] text-muted-foreground">Loading notes…</div>
         ) : notes.length === 0 ? (
           <div className="text-[13.5px] text-muted-foreground">
-            Nothing yet - ask JARVIS to save a note and it&rsquo;ll show up here.
+            Nothing yet - ask FRIDAY to save a note and it&rsquo;ll show up here.
           </div>
         ) : (
           <div className="flex flex-col gap-2.5">

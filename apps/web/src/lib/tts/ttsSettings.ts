@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'jarvis:tts-settings';
+const STORAGE_KEY = 'friday:tts-settings';
 
 export interface TtsSettings {
   /** SpeechSynthesisVoice.voiceURI of the chosen voice, or null to use the browser's default. */

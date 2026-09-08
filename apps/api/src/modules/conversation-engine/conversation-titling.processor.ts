@@ -13,7 +13,7 @@ import { CONVERSATION_TITLING_QUEUE, ConversationTitlingJob } from './conversati
 const MAX_MESSAGES_FOR_TITLE = 3;
 const MAX_TITLE_LENGTH = 80;
 
-const TITLE_INSTRUCTION = `Generate a short, specific title for this conversation between a user and JARVIS, an AI assistant, based on the excerpt below. The title should be 3-6 words, written in the same language as the conversation. Reply with the title only - no surrounding quotes, no trailing punctuation, nothing else.`;
+const TITLE_INSTRUCTION = `Generate a short, specific title for this conversation between a user and FRIDAY, an AI assistant, based on the excerpt below. The title should be 3-6 words, written in the same language as the conversation. Reply with the title only - no surrounding quotes, no trailing punctuation, nothing else.`;
 
 // Runs off the request path (see ConversationEngineService.streamTurn) -
 // only ever generates/overwrites a title while it's still exactly
@@ -47,7 +47,7 @@ export class ConversationTitlingProcessor extends WorkerHost {
     if (messages.length === 0) return;
 
     const transcript = messages
-      .map((m) => `${m.role === MessageRole.ASSISTANT ? 'JARVIS' : 'User'}: ${m.content}`)
+      .map((m) => `${m.role === MessageRole.ASSISTANT ? 'FRIDAY' : 'User'}: ${m.content}`)
       .join('\n');
 
     let title: string;

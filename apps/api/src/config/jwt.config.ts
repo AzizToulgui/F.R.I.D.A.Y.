@@ -16,7 +16,7 @@ export const jwtConfig = registerAs(
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
     refreshSecret: process.env.JWT_REFRESH_SECRET as string,
     refreshExpiresInDays: parseInt(process.env.JWT_REFRESH_EXPIRES_IN_DAYS ?? '7', 10),
-    issuer: process.env.JWT_ISSUER ?? 'jarvis',
-    audience: process.env.JWT_AUDIENCE ?? 'jarvis-clients',
+    issuer: process.env.JWT_ISSUER ?? 'friday',
+    audience: process.env.JWT_AUDIENCE ?? 'friday-clients',
   }),
 );

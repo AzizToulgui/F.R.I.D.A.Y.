@@ -5,7 +5,7 @@ import { Queue } from 'bullmq';
 import { ConversationConfig } from '../../config/conversation.config';
 import { AIProvider } from '../ai-provider/ai-provider.interface';
 import { ChatMessage, GenerateTextResult, TokenUsage } from '../ai-provider/ai-provider.types';
-import { JARVIS_TEXT_SYSTEM_PROMPT } from '../ai-provider/jarvis-persona';
+import { FRIDAY_TEXT_SYSTEM_PROMPT } from '../ai-provider/friday-persona';
 import { ConversationsService } from '../conversations/conversations.service';
 import { Conversation, DEFAULT_CONVERSATION_TITLE } from '../conversations/entities/conversation.entity';
 import { DocumentsService, RetrievedChunk } from '../documents/documents.service';
@@ -28,7 +28,7 @@ export interface TurnResult {
   usage: TokenUsage;
 }
 
-const SUMMARY_INSTRUCTION = `Summarize the following older portion of an ongoing conversation between a user and JARVIS, an AI assistant. Preserve names, facts, decisions, and unresolved questions the user cares about. Write the summary in the same language the conversation is in - do not translate it. Be concise - a few sentences to a short paragraph. Reply with the summary itself only, no preamble.`;
+const SUMMARY_INSTRUCTION = `Summarize the following older portion of an ongoing conversation between a user and FRIDAY, an AI assistant. Preserve names, facts, decisions, and unresolved questions the user cares about. Write the summary in the same language the conversation is in - do not translate it. Be concise - a few sentences to a short paragraph. Reply with the summary itself only, no preamble.`;
 
 // Safety cap on Gemini <-> tool round trips within a single turn - a
 // well-behaved model resolves in 1-2, this only guards against a runaway
@@ -239,7 +239,7 @@ export class ConversationEngineService {
     relevantChunks: RetrievedChunk[],
     timezone?: string,
   ): string {
-    const parts = [JARVIS_TEXT_SYSTEM_PROMPT];
+    const parts = [FRIDAY_TEXT_SYSTEM_PROMPT];
     const timezoneNote = this.describeTimezone(timezone);
     if (timezoneNote) parts.push(timezoneNote);
     if (relevantMemories.length > 0) {
@@ -318,7 +318,7 @@ export class ConversationEngineService {
   /** Returns the new summary text, or null if the summarization call itself failed. */
   private async extendSummary(existing: string | null, toSummarize: Message[]): Promise<string | null> {
     const transcript = toSummarize
-      .map((m) => `${m.role === MessageRole.ASSISTANT ? 'JARVIS' : 'User'}: ${m.content}`)
+      .map((m) => `${m.role === MessageRole.ASSISTANT ? 'FRIDAY' : 'User'}: ${m.content}`)
       .join('\n');
     const prompt = existing
       ? `${SUMMARY_INSTRUCTION}\n\nExisting summary of even earlier context:\n${existing}\n\nNew messages to fold in:\n${transcript}`

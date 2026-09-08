@@ -72,7 +72,7 @@ function LoginForm() {
             <div className="h-5 w-5 rounded-full border border-ac-m" />
             <div className="absolute h-[7px] w-[7px] rounded-full bg-ac-tx shadow-[0_0_10px_2px_rgba(95,216,255,0.8)]" />
           </div>
-          <span className="text-[15px] font-medium tracking-[0.22em] text-muted-foreground">JARVIS</span>
+          <span className="text-[15px] font-medium tracking-[0.22em] text-muted-foreground">FRIDAY</span>
         </div>
 
         <Card>

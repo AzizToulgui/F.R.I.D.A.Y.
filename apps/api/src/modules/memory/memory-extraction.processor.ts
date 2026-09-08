@@ -10,7 +10,7 @@ import { MessagesService } from '../messages/messages.service';
 import { MEMORY_EXTRACTION_QUEUE, MemoryExtractionJob } from './memory-extraction.queue';
 import { MemoriesService } from './memories.service';
 
-const EXTRACTION_INSTRUCTION = `You are extracting durable, cross-conversation facts about a user from a snippet of their conversation with JARVIS, an AI assistant.
+const EXTRACTION_INSTRUCTION = `You are extracting durable, cross-conversation facts about a user from a snippet of their conversation with FRIDAY, an AI assistant.
 
 Identify only facts worth remembering long-term: stable preferences, identity details, ongoing projects, relationships, recurring context. Do NOT extract: raw credentials or secrets, health specifics, financial specifics, or anything that clearly only applies to this one conversation.
 
@@ -52,7 +52,7 @@ export class MemoryExtractionProcessor extends WorkerHost {
     if (candidates.length === 0) return;
 
     const transcript = candidates
-      .map((m) => `${m.role === MessageRole.ASSISTANT ? 'JARVIS' : 'User'}: ${m.content}`)
+      .map((m) => `${m.role === MessageRole.ASSISTANT ? 'FRIDAY' : 'User'}: ${m.content}`)
       .join('\n');
 
     let raw: string;

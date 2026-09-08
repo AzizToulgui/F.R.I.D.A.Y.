@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// Gemini's real replies use markdown (JARVIS_TEXT_SYSTEM_PROMPT explicitly
+// Gemini's real replies use markdown (FRIDAY_TEXT_SYSTEM_PROMPT explicitly
 // allows "plain prose and light markdown") - this renders it properly
 // instead of showing raw asterisks/backticks/pipes as literal text.
 // Deliberately no syntax-highlighting tokenizer (e.g. shiki/prismjs) - that's

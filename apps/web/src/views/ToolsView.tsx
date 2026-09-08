@@ -208,8 +208,8 @@ export function ToolsView() {
       <div className="mx-auto max-w-[860px] px-6 pt-[38px] pb-[60px]">
         <h1 className="m-0 text-[26px] font-normal text-foreground">Tools</h1>
         <p className="mt-2 mb-[22px] max-w-[52ch] text-sm leading-[1.65] text-muted-foreground">
-          Capabilities JARVIS can use on your behalf, in both voice and text.
-          Switch a whole capability off to stop JARVIS from using any part of
+          Capabilities FRIDAY can use on your behalf, in both voice and text.
+          Switch a whole capability off to stop FRIDAY from using any part of
           it.
         </p>
 

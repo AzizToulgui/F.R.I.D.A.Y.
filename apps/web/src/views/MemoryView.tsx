@@ -114,7 +114,7 @@ export function MemoryView() {
       <div className="mx-auto max-w-[820px] px-6 pt-[38px] pb-[60px]">
         <h1 className="m-0 text-[26px] font-normal text-foreground">Memory</h1>
         <p className="mt-2 max-w-[52ch] text-sm leading-[1.65] text-muted-foreground">
-          JARVIS keeps a small set of facts so future conversations start informed. Everything here is editable, and
+          FRIDAY keeps a small set of facts so future conversations start informed. Everything here is editable, and
           nothing is stored without appearing on this page.
         </p>
         <div className="my-[22px] mb-[18px] flex flex-wrap gap-2.5">
@@ -142,7 +142,7 @@ export function MemoryView() {
         ) : filtered.length === 0 ? (
           <div className="text-[13.5px] text-muted-foreground">
             {memories.length === 0
-              ? "Nothing remembered yet - it fills in as you talk to JARVIS."
+              ? "Nothing remembered yet - it fills in as you talk to FRIDAY."
               : 'No memories match your search.'}
           </div>
         ) : (

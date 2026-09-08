@@ -22,7 +22,7 @@ const SNIPPET_LENGTH = 300;
 export class SearchApplicationDataTool implements ToolDefinition<Params> {
   readonly name = 'search_application_data';
   readonly description =
-    "Searches the user's own past conversations with JARVIS for messages matching a keyword or phrase. Use this when the user references something they said in a different, earlier conversation that isn't already in view.";
+    "Searches the user's own past conversations with FRIDAY for messages matching a keyword or phrase. Use this when the user references something they said in a different, earlier conversation that isn't already in view.";
   readonly requiresConfirmation = false;
   readonly parameters = paramsSchema;
   readonly parametersJsonSchema = {

@@ -132,7 +132,7 @@ export class WeatherService {
     try {
       // Nominatim's usage policy requires an identifying User-Agent, or
       // requests may be blocked outright.
-      response = await fetch(url, { headers: { 'User-Agent': 'JARVIS-Assistant/1.0 (personal use)' } });
+      response = await fetch(url, { headers: { 'User-Agent': 'FRIDAY-Assistant/1.0 (personal use)' } });
     } catch {
       throw new ServiceUnavailableException('Could not reach the location lookup service right now.');
     }

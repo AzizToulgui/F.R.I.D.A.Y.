@@ -93,7 +93,7 @@ export interface VoiceDeliveryStyleOption {
   key: string;
   label: string;
   // Folded into the Live session's system instruction (see
-  // jarvis-persona.buildVoiceSystemPrompt) - unlike voiceName, this isn't a
+  // friday-persona.buildVoiceSystemPrompt) - unlike voiceName, this isn't a
   // Gemini API parameter, just steering text the model tends to follow.
   instruction: string;
 }

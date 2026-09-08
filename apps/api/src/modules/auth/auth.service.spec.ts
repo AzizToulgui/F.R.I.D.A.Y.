@@ -14,8 +14,8 @@ const JWT_CONFIG = {
   accessExpiresIn: '15m',
   refreshSecret: 'test-refresh-secret',
   refreshExpiresInDays: 7,
-  issuer: 'jarvis-test',
-  audience: 'jarvis-test-clients',
+  issuer: 'friday-test',
+  audience: 'friday-test-clients',
 };
 
 describe('AuthService', () => {

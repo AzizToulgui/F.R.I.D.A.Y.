@@ -7,7 +7,7 @@ import fastifyCookie from '@fastify/cookie';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 
-describe('JARVIS API (e2e)', () => {
+describe('FRIDAY API (e2e)', () => {
   let app: NestFastifyApplication;
   let dataSource: DataSource;
 
@@ -174,7 +174,7 @@ describe('JARVIS API (e2e)', () => {
         method: 'POST',
         url: `/api/conversations/${conversationId}/messages`,
         headers: { authorization: `Bearer ${accessToken}` },
-        payload: { role: 'user', content: 'Hello JARVIS' },
+        payload: { role: 'user', content: 'Hello FRIDAY' },
       });
       expect(createResponse.statusCode).toBe(201);
 
@@ -186,7 +186,7 @@ describe('JARVIS API (e2e)', () => {
       expect(listResponse.statusCode).toBe(200);
       const messages = listResponse.json();
       expect(messages).toHaveLength(1);
-      expect(messages[0].content).toBe('Hello JARVIS');
+      expect(messages[0].content).toBe('Hello FRIDAY');
     });
 
     it('rejects an empty turn body with 400 before touching Gemini', async () => {

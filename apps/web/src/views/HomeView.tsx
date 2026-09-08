@@ -37,7 +37,7 @@ export function HomeView({
         state="idle"
         className="size-44 pointer-events-none [filter:grayscale(1)_sepia(1)_hue-rotate(150deg)_saturate(4.5)_brightness(1.15)]"
       />
-      <div className="mt-1 font-mono text-[10.5px] tracking-[0.34em] text-muted-foreground">JARVIS CORE</div>
+      <div className="mt-1 font-mono text-[10.5px] tracking-[0.34em] text-muted-foreground">FRIDAY CORE</div>
       <h1 className="my-3.5 mt-3.5 mb-[26px] text-[30px] leading-none font-normal tracking-[-0.01em] text-foreground">
         How can I assist?
       </h1>

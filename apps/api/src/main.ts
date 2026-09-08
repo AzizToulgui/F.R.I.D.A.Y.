@@ -65,7 +65,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   await app.listen(appConfig.port, '0.0.0.0');
-  new Logger('Bootstrap').log(`JARVIS API listening on port ${appConfig.port} [${appConfig.environment}]`);
+  new Logger('Bootstrap').log(`FRIDAY API listening on port ${appConfig.port} [${appConfig.environment}]`);
 }
 
 bootstrap();

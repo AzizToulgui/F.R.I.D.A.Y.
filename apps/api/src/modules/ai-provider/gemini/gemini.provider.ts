@@ -24,7 +24,7 @@ import {
   TokenUsage,
   ToolDeclaration,
 } from '../ai-provider.types';
-import { buildVoiceSystemPrompt } from '../jarvis-persona';
+import { buildVoiceSystemPrompt } from '../friday-persona';
 
 // Ephemeral auth tokens are a Gemini Developer API feature and, per the SDK,
 // only available on the v1alpha surface - stable APIs (text/embeddings, once
@@ -295,7 +295,7 @@ export class GeminiProvider extends AIProvider {
     try {
       const response = await ai.models.generateContent({
         model: this.config.ttsModel,
-        // A bare sentence (e.g. "Hi, I'm JARVIS.") reads as a conversational
+        // A bare sentence (e.g. "Hi, I'm FRIDAY.") reads as a conversational
         // prompt - the TTS model tried to reply to it with text instead of
         // just speaking it (400 INVALID_ARGUMENT: "Model tried to generate
         // text, but it should only be used for TTS"). This framing forces
@@ -350,7 +350,7 @@ export class GeminiProvider extends AIProvider {
               inputAudioTranscription: {},
               outputAudioTranscription: {},
               // A Live session has no per-turn system instruction like text
-              // generation does, so JARVIS's identity/multilingual behavior
+              // generation does, so FRIDAY's identity/multilingual behavior
               // has to be locked in here, once, for the whole session.
               systemInstruction: buildVoiceSystemPrompt(voice?.deliveryStyleInstruction),
               tools: toGeminiTools(tools),

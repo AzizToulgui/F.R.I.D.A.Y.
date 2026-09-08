@@ -1,8 +1,8 @@
 {
-  "name": "@jarvis/api",
+  "name": "@friday/api",
   "version": "0.1.0",
   "private": true,
-  "description": "JARVIS backend - NestJS foundation",
+  "description": "FRIDAY backend - NestJS foundation",
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

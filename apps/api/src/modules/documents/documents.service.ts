@@ -89,7 +89,7 @@ export class DocumentsService {
       }),
     );
 
-    const filePath = path.join(os.tmpdir(), `jarvis-doc-${document.id}-${randomUUID()}`);
+    const filePath = path.join(os.tmpdir(), `friday-doc-${document.id}-${randomUUID()}`);
     try {
       await fs.writeFile(filePath, buffer);
       await this.indexingQueue.add('index', { documentId: document.id, userId, filePath, format });

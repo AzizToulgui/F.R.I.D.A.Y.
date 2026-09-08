@@ -130,7 +130,7 @@ function AccountPanel() {
     <div>
       <h1 className="m-0 mb-1 text-xl font-medium text-foreground">Account</h1>
       <p className="m-0 mb-5 text-sm text-muted-foreground">
-        Connect Google to let JARVIS see unread email, manage your calendar, and search the web.
+        Connect Google to let FRIDAY see unread email, manage your calendar, and search the web.
       </p>
 
       {loading ? (
@@ -339,7 +339,7 @@ function VoicePanel() {
           <div className="flex items-center gap-3 border-t border-b py-4">
             <div className="flex-1">
               <div className="text-sm font-medium text-foreground">Delivery style</div>
-              <div className="mt-1 text-sm text-muted-foreground">How JARVIS paces and phrases what it says out loud.</div>
+              <div className="mt-1 text-sm text-muted-foreground">How FRIDAY paces and phrases what it says out loud.</div>
             </div>
             <Select
               value={settings.voiceDeliveryStyle ?? DELIVERY_STYLE_DEFAULT}
@@ -378,7 +378,7 @@ function VoicePanel() {
 
 const PREVIEW_TEXT = "This is a preview of your read-aloud voice.";
 
-/** Settings for the browser-native "Read aloud" button on chat responses - a separate TTS engine from JARVIS's own spoken voice above, so it gets its own controls and its own (client-only, localStorage-backed) settings. */
+/** Settings for the browser-native "Read aloud" button on chat responses - a separate TTS engine from FRIDAY's own spoken voice above, so it gets its own controls and its own (client-only, localStorage-backed) settings. */
 function ReadAloudPanel() {
   const voices = useSpeechVoices();
   const [settings, setSettings] = useState<TtsSettings>(DEFAULT_TTS_SETTINGS);
@@ -539,7 +539,7 @@ export function SettingsView({ theme, onSetTheme, onClose, initialTab }: Setting
               <div>
                 <h1 className="m-0 mb-1 text-xl font-medium text-foreground">Appearance</h1>
                 <p className="m-0 mb-5 text-sm text-muted-foreground">
-                  Dark is the default JARVIS experience. Light mode keeps the same structure and accent.
+                  Dark is the default FRIDAY experience. Light mode keeps the same structure and accent.
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">

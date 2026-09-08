@@ -125,7 +125,7 @@ export function Sidebar({
             <div className="absolute h-[5px] w-[5px] animate-[jv-breathe_4s_ease-in-out_infinite] rounded-full bg-ac-tx shadow-[0_0_10px_2px_rgba(95,216,255,0.8)]" />
           </div>
           <span className="whitespace-nowrap text-[13px] font-medium tracking-[0.22em] text-muted-foreground">
-            JARVIS
+            FRIDAY
           </span>
           <Button
             type="button"

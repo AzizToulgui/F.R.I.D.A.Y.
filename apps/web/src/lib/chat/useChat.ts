@@ -161,7 +161,7 @@ export function useChat(): UseChatResult {
         setMsgs(
           history
             .filter((m) => m.role === 'user' || m.role === 'assistant')
-            .map((m) => ({ role: m.role === 'assistant' ? 'jarvis' : 'user', text: m.content }) as ChatMessage),
+            .map((m) => ({ role: m.role === 'assistant' ? 'friday' : 'user', text: m.content }) as ChatMessage),
         );
       } catch (e) {
         if (seq !== requestSeqRef.current) return;
@@ -225,7 +225,7 @@ export function useChat(): UseChatResult {
       if (prev.length === 0) return prev;
       const next = prev.slice();
       const last = next[next.length - 1];
-      next[next.length - 1] = { role: 'jarvis', text: last.text + delta };
+      next[next.length - 1] = { role: 'friday', text: last.text + delta };
       return next;
     });
   }, []);
@@ -238,7 +238,7 @@ export function useChat(): UseChatResult {
       if (prev.length === 0) return prev;
       const next = prev.slice();
       const last = next[next.length - 1];
-      if (last.role === 'jarvis') next[next.length - 1] = { ...last, errorMessage: message };
+      if (last.role === 'friday') next[next.length - 1] = { ...last, errorMessage: message };
       return next;
     });
   }, []);
@@ -250,7 +250,7 @@ export function useChat(): UseChatResult {
       streamingRef.current = true;
       setError(null);
       setStreaming(true);
-      setMsgs((prev) => [...prev, { role: 'user', text: trimmed }, { role: 'jarvis', text: '' }]);
+      setMsgs((prev) => [...prev, { role: 'user', text: trimmed }, { role: 'friday', text: '' }]);
 
       const isNewConversation = !conversationIdRef.current;
       try {

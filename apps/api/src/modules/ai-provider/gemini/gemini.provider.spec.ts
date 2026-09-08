@@ -73,7 +73,7 @@ describe('GeminiProvider.mintLiveSessionToken', () => {
     // The Live session has no per-turn system instruction, so identity and
     // multilingual behavior must be locked into the token itself.
     expect(call.config.liveConnectConstraints.config.systemInstruction).toEqual(
-      expect.stringContaining('JARVIS'),
+      expect.stringContaining('FRIDAY'),
     );
   });
 

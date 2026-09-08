@@ -98,8 +98,8 @@ export function MessageComposer({
           onKeyDown={onKeyDown}
           rows={1}
           dir="auto"
-          aria-label="Message JARVIS"
-          placeholder="Ask JARVIS anything…  ⏎ to send · ⇧⏎ for a new line"
+          aria-label="Message FRIDAY"
+          placeholder="Ask FRIDAY anything…  ⏎ to send · ⇧⏎ for a new line"
           className="max-h-40 min-h-[52px] resize-none rounded-none border-0 bg-transparent px-[18px] pt-4 pb-1 text-[14.5px] leading-relaxed shadow-none focus-visible:ring-0"
         />
         <div className="flex items-center gap-2 px-3 pt-2 pb-2.5">

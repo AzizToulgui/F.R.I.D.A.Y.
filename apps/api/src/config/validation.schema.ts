@@ -22,8 +22,8 @@ export const validationSchema = Joi.object({
     .default('15m'),
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),
   JWT_REFRESH_EXPIRES_IN_DAYS: Joi.number().default(7),
-  JWT_ISSUER: Joi.string().default('jarvis'),
-  JWT_AUDIENCE: Joi.string().default('jarvis-clients'),
+  JWT_ISSUER: Joi.string().default('friday'),
+  JWT_AUDIENCE: Joi.string().default('friday-clients'),
 
   THROTTLE_TTL_MS: Joi.number().default(60000),
   THROTTLE_LIMIT: Joi.number().default(100),

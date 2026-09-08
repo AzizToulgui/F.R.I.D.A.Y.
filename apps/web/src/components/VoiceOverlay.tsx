@@ -140,7 +140,7 @@ export function VoiceOverlay({ onClose }: VoiceOverlayProps) {
       className="absolute inset-0 z-50 flex animate-[jv-rise_0.2s_ease-out] flex-col outline-none [background:radial-gradient(900px_620px_at_50%_42%,var(--ac-xs),transparent_70%),var(--bg-voice)]"
     >
       <div className="relative flex h-14 flex-none items-center justify-center">
-        <div className="font-mono text-[10.5px] tracking-[0.34em] text-muted-foreground">JARVIS</div>
+        <div className="font-mono text-[10.5px] tracking-[0.34em] text-muted-foreground">FRIDAY</div>
         <Button
           type="button"
           variant="outline"
