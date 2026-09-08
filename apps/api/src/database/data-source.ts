@@ -10,6 +10,8 @@ import { Document } from '../modules/documents/entities/document.entity';
 import { Note } from '../modules/notes/entities/note.entity';
 import { Reminder } from '../modules/reminders/entities/reminder.entity';
 import { ToolInvocation } from '../modules/tools/entities/tool-invocation.entity';
+import { GoogleAccount } from '../modules/google/entities/google-account.entity';
+import { VoiceMemo } from '../modules/voice-memos/entities/voice-memo.entity';
 
 // Used only by the TypeORM CLI (migration:generate/run/revert). The running
 // application gets its connection through TypeOrmModule.forRootAsync in
@@ -32,6 +34,8 @@ export const AppDataSource = new DataSource({
     ToolInvocation,
     Document,
     DocumentChunk,
+    GoogleAccount,
+    VoiceMemo,
   ],
   migrations: ['src/database/migrations/*.ts'],
   synchronize: false,

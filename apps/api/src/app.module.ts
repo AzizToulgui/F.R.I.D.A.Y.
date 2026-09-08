@@ -8,7 +8,9 @@ import {
   appConfig,
   conversationConfig,
   databaseConfig,
+  encryptionConfig,
   geminiConfig,
+  googleConfig,
   jwtConfig,
   memoryConfig,
   ragConfig,
@@ -35,6 +37,8 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { RemindersModule } from './modules/reminders/reminders.module';
 import { ToolsModule } from './modules/tools/tools.module';
+import { GoogleModule } from './modules/google/google.module';
+import { VoiceMemosModule } from './modules/voice-memos/voice-memos.module';
 
 @Module({
   imports: [
@@ -51,6 +55,8 @@ import { ToolsModule } from './modules/tools/tools.module';
         conversationConfig,
         memoryConfig,
         ragConfig,
+        googleConfig,
+        encryptionConfig,
       ],
       validationSchema,
       validationOptions: { abortEarly: false, allowUnknown: true },
@@ -93,6 +99,8 @@ import { ToolsModule } from './modules/tools/tools.module';
     NotesModule,
     ToolsModule,
     DocumentsModule,
+    GoogleModule,
+    VoiceMemosModule,
   ],
   providers: [
     // Order matters: rate limiting rejects abusive traffic before it ever

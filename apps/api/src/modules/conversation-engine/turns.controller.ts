@@ -1,4 +1,4 @@
-import { Body, Controller, Logger, Param, ParseUUIDPipe, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, HttpException, Logger, Param, ParseUUIDPipe, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { AppConfig } from '../../config/app.config';
@@ -78,7 +78,14 @@ export class TurnsController {
       }
     } catch (error) {
       this.logger.error('Turn generation failed', error instanceof Error ? error.stack : error);
-      if (!aborted) write('error', { message: 'Something went wrong generating a response.' });
+      // HttpException messages thrown anywhere in the turn pipeline (e.g.
+      // GeminiProvider's quota/auth-specific errors) are already written to
+      // be shown to the user as-is - anything else (an unexpected bug, a raw
+      // DB error) falls back to a generic message so it can't leak internals.
+      if (!aborted) {
+        const message = error instanceof HttpException ? error.message : 'Something went wrong generating a response.';
+        write('error', { message });
+      }
     } finally {
       reply.raw.end();
     }

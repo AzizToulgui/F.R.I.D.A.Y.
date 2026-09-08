@@ -41,6 +41,19 @@ export class UsersService {
     return this.usersRepository.save(user);
   }
 
+  // For "Continue with Google" signups - no password is ever set. Unlike
+  // `create`, this doesn't throw on an existing email: the caller (Google
+  // OAuth callback) already checked `findByEmail` and only reaches here for
+  // a genuinely new user.
+  async createFromGoogle(params: { email: string; displayName: string }): Promise<User> {
+    const user = this.usersRepository.create({
+      email: this.normalizeEmail(params.email),
+      passwordHash: null,
+      displayName: params.displayName,
+    });
+    return this.usersRepository.save(user);
+  }
+
   // `undefined` fields are left untouched (partial update); pass `null`
   // explicitly to clear a preference back to Gemini's default.
   async updateVoiceSettings(
@@ -53,6 +66,18 @@ export class UsersService {
     }
     if (updates.voiceName !== undefined) user.voiceName = updates.voiceName;
     if (updates.voiceDeliveryStyle !== undefined) user.voiceDeliveryStyle = updates.voiceDeliveryStyle;
+    return this.usersRepository.save(user);
+  }
+
+  async setToolEnabled(userId: string, toolName: string, enabled: boolean): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    const disabled = new Set(user.disabledTools);
+    if (enabled) disabled.delete(toolName);
+    else disabled.add(toolName);
+    user.disabledTools = [...disabled];
     return this.usersRepository.save(user);
   }
 }

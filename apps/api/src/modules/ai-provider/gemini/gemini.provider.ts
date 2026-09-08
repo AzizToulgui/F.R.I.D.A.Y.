@@ -1,6 +1,13 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Content, GoogleGenAI, Modality, ThinkingLevel } from '@google/genai';
+import { ApiError, Content, GoogleGenAI, Modality, ThinkingLevel } from '@google/genai';
 import type { GenerateContentResponse, GenerateContentResponseUsageMetadata, Part, Tool } from '@google/genai';
 import { GeminiConfig } from '../../../config/gemini.config';
 import { AIProvider } from '../ai-provider.interface';
@@ -91,19 +98,26 @@ function toUsage(usage?: GenerateContentResponseUsageMetadata): TokenUsage {
   };
 }
 
-// Provider-agnostic ToolDeclaration -> the Gemini SDK's Tool shape. All of a
-// turn's tools are declared under one Tool entry, matching how Gemini expects them.
-function toGeminiTools(tools?: ToolDeclaration[]): Tool[] | undefined {
-  if (!tools?.length) return undefined;
-  return [
-    {
+// Provider-agnostic ToolDeclaration -> the Gemini SDK's Tool shape, plus a
+// standing native Google Search grounding tool (real web search, no
+// separate API/key - the Custom Search JSON API's "search the entire web"
+// mode was deprecated for new engines, so this replaced the custom
+// web_search tool entirely). Declared as a sibling Tool entry rather than
+// merged into the functionDeclarations one - both googleSearch and
+// functionDeclarations combining in the same `tools` array is documented,
+// supported Gemini 2.0+ "compositional" tool use.
+function toGeminiTools(tools?: ToolDeclaration[]): Tool[] {
+  const geminiTools: Tool[] = [{ googleSearch: {} }];
+  if (tools?.length) {
+    geminiTools.push({
       functionDeclarations: tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         parametersJsonSchema: tool.parametersJsonSchema,
       })),
-    },
-  ];
+    });
+  }
+  return geminiTools;
 }
 
 // Deliberately reads parts directly instead of the SDK's `response.functionCalls`
@@ -120,6 +134,28 @@ function extractFunctionCalls(response: GenerateContentResponse): FunctionCallRe
       thoughtSignature: part.thoughtSignature,
     }));
   return calls?.length ? calls : undefined;
+}
+
+// Translates a Gemini SDK error into a specific, user-safe HttpException -
+// most importantly distinguishing "you're out of API quota/credits" (429,
+// the SDK's ApiError.status) from a generic outage, so the chat UI can show
+// what's actually wrong instead of a one-size-fits-all "something went
+// wrong". Every message here is intentionally written to be shown to the
+// end user as-is (see TurnsController, which forwards HttpException messages
+// verbatim over the turn's SSE `error` event, but not other error types).
+function toGeminiHttpException(error: unknown, fallback: string): HttpException {
+  if (error instanceof ApiError) {
+    if (error.status === 429) {
+      return new HttpException(
+        "You've hit your Gemini API quota or credit limit. Check your plan and billing at https://ai.google.dev/gemini-api/docs/rate-limits, or wait for it to reset, then try again.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    if (error.status === 401 || error.status === 403) {
+      return new UnauthorizedException('The Gemini API key configured on this server was rejected - it may be invalid, revoked, or missing billing.');
+    }
+  }
+  return new ServiceUnavailableException(fallback);
 }
 
 // Concrete Gemini implementation of AIProvider. Live session token minting
@@ -173,7 +209,7 @@ export class GeminiProvider extends AIProvider {
       };
     } catch (error) {
       this.logger.error('Gemini generateText failed', error instanceof Error ? error.stack : error);
-      throw new ServiceUnavailableException('Could not reach Gemini for a text response right now.');
+      throw toGeminiHttpException(error, 'Could not reach Gemini for a text response right now.');
     }
   }
 
@@ -195,7 +231,7 @@ export class GeminiProvider extends AIProvider {
         'Gemini generateTextStream failed to start',
         error instanceof Error ? error.stack : error,
       );
-      throw new ServiceUnavailableException('Could not reach Gemini for a text response right now.');
+      throw toGeminiHttpException(error, 'Could not reach Gemini for a text response right now.');
     }
 
     let content = '';
@@ -213,7 +249,7 @@ export class GeminiProvider extends AIProvider {
       }
     } catch (error) {
       this.logger.error('Gemini generateTextStream failed mid-stream', error instanceof Error ? error.stack : error);
-      throw new ServiceUnavailableException('The response from Gemini was interrupted.');
+      throw toGeminiHttpException(error, 'The response from Gemini was interrupted.');
     }
     return { content, usage, functionCalls };
   }

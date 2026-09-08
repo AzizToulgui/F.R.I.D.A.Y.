@@ -70,6 +70,8 @@ export function VoiceOverlay({ onClose }: VoiceOverlayProps) {
     toggleMuted,
     start,
     stop,
+    recordingMemo,
+    stopRecordingMemo,
   } = useLiveSession();
   const [transcriptOn, setTranscriptOn] = useState(true);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -176,6 +178,18 @@ export function VoiceOverlay({ onClose }: VoiceOverlayProps) {
           {label}
         </div>
         <div className="flex-none font-mono text-[10.5px] tracking-[0.2em] text-muted-foreground">{sub}</div>
+        {recordingMemo && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={stopRecordingMemo}
+            className="flex-none gap-2 border-destructive/40 bg-destructive/10 text-destructive"
+          >
+            <span className="size-2 rounded-full bg-destructive [animation:jv-eq_1.1s_ease-in-out_infinite]" />
+            Stop Recording
+          </Button>
+        )}
         {errorMessage && (
           <div className="flex-none text-[12.5px] text-destructive">
             {errorMessage}{' '}

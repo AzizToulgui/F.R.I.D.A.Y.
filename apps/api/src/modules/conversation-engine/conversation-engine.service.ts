@@ -14,6 +14,7 @@ import { Message, MessageRole } from '../messages/entities/message.entity';
 import { MessagesService } from '../messages/messages.service';
 import { ToolExecutionService } from '../tools/tool-execution.service';
 import { ToolRegistryService } from '../tools/tool-registry.service';
+import { UsersService } from '../users/users.service';
 import { CONVERSATION_TITLING_QUEUE, ConversationTitlingJob } from './conversation-titling.queue';
 
 export interface TurnContext {
@@ -46,6 +47,7 @@ export class ConversationEngineService {
     private readonly documentsService: DocumentsService,
     private readonly toolRegistry: ToolRegistryService,
     private readonly toolExecutionService: ToolExecutionService,
+    private readonly usersService: UsersService,
     private readonly aiProvider: AIProvider,
     @InjectQueue(CONVERSATION_TITLING_QUEUE)
     private readonly titlingQueue: Queue<ConversationTitlingJob>,
@@ -72,7 +74,8 @@ export class ConversationEngineService {
   ): AsyncGenerator<string, TurnResult, void> {
     await this.recordUserMessage(conversation.id, content);
     const context = await this.buildTurnContext(conversation, content, timezone);
-    const tools = this.toolRegistry.getDeclarations();
+    const user = await this.usersService.findById(conversation.userId);
+    const tools = this.toolRegistry.getDeclarations('text', user?.disabledTools);
 
     let messages = context.messages;
     let result: GenerateTextResult | undefined;

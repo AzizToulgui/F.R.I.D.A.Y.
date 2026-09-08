@@ -71,11 +71,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [applySession, clearSession]);
 
+  // Guards against React Strict Mode's dev-only double-invocation of mount
+  // effects: without this, two near-simultaneous /auth/refresh calls both
+  // read the same refresh-token cookie, the first rotates it, and the
+  // second gets flagged as reuse of a now-stale token - which the backend
+  // (correctly, in general) treats as a possible compromise and revokes the
+  // whole session, silently bouncing an otherwise-successful login back to
+  // signed-out. A ref (not state) survives Strict Mode's synthetic
+  // unmount/remount, so the guard holds across both invocations.
+  const hasBootstrapped = useRef(false);
   useEffect(() => {
+    if (hasBootstrapped.current) return;
+    hasBootstrapped.current = true;
     // Only on mount: restore a session from the refresh cookie, if any. The
     // resulting setState happens asynchronously after the network request
     // resolves, not synchronously within the effect body.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

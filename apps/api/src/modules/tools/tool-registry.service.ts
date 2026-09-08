@@ -22,11 +22,15 @@ export class ToolRegistryService {
     return [...this.byName.values()];
   }
 
-  getDeclarations(): ToolDeclaration[] {
-    return this.list().map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      parametersJsonSchema: tool.parametersJsonSchema,
-    }));
+  getDeclarations(channel: 'text' | 'voice' = 'text', disabledToolNames: string[] = []): ToolDeclaration[] {
+    const disabled = new Set(disabledToolNames);
+    return this.list()
+      .filter((tool) => !tool.channels || tool.channels.includes(channel))
+      .filter((tool) => !disabled.has(tool.name))
+      .map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        parametersJsonSchema: tool.parametersJsonSchema,
+      }));
   }
 }

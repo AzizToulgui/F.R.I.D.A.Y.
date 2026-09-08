@@ -6,6 +6,7 @@ import { DocumentsModule } from '../documents/documents.module';
 import { MemoryModule } from '../memory/memory.module';
 import { MessagesModule } from '../messages/messages.module';
 import { ToolsModule } from '../tools/tools.module';
+import { UsersModule } from '../users/users.module';
 import { ConversationEngineService } from './conversation-engine.service';
 import { CONVERSATION_TITLING_QUEUE } from './conversation-titling.queue';
 import { ConversationTitlingProcessor } from './conversation-titling.processor';
@@ -19,6 +20,7 @@ import { TurnsController } from './turns.controller';
     MemoryModule,
     ToolsModule,
     DocumentsModule,
+    UsersModule,
     BullModule.registerQueue({ name: CONVERSATION_TITLING_QUEUE }),
   ],
   controllers: [TurnsController],

@@ -7,4 +7,6 @@ export * from './gemini.config';
 export * from './conversation.config';
 export * from './memory.config';
 export * from './rag.config';
+export * from './google.config';
+export * from './encryption.config';
 export * from './validation.schema';

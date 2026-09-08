@@ -4,11 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import type { ChatMessage } from '@/types';
 
-// Persisted so refreshing the page (or reopening the tab) resumes the same
-// conversation instead of silently starting a new one - see the "why aren't
-// conversations being saved" gap: messages were always saved server-side,
-// but nothing remembered *which* conversation to come back to.
-const ACTIVE_CONVERSATION_KEY = 'jarvis:activeConversationId';
 // The backend auto-titles a new conversation in the background (see
 // ConversationTitlingProcessor) once it has enough of the first exchange to
 // work with - it isn't done by the time send()'s own refreshConversations()
@@ -152,8 +147,6 @@ export function useChat(): UseChatResult {
   const setActive = useCallback((id: string | null) => {
     conversationIdRef.current = id;
     setActiveConversationId(id);
-    if (id) localStorage.setItem(ACTIVE_CONVERSATION_KEY, id);
-    else localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
   }, []);
 
   const switchTo = useCallback(
@@ -219,12 +212,11 @@ export function useChat(): UseChatResult {
     [authFetch, conversations],
   );
 
-  // Resume whatever conversation was active last (if any) and populate the
-  // sidebar's list - runs once, on mount.
+  // Populates the sidebar's list on mount - deliberately does not resume the
+  // last active conversation, so every fresh load/login lands on Home
+  // (see AppShell's route state) rather than jumping back into a chat.
   useEffect(() => {
     void refreshConversations();
-    const savedId = localStorage.getItem(ACTIVE_CONVERSATION_KEY);
-    if (savedId) void switchTo(savedId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -234,6 +226,19 @@ export function useChat(): UseChatResult {
       const next = prev.slice();
       const last = next[next.length - 1];
       next[next.length - 1] = { role: 'jarvis', text: last.text + delta };
+      return next;
+    });
+  }, []);
+
+  // A failed turn attaches its error to the pending assistant message itself
+  // (rendered in place of the response, or after any partial text already
+  // streamed) instead of a separate banner - see ChatView.
+  const setLastMessageError = useCallback((message: string) => {
+    setMsgs((prev) => {
+      if (prev.length === 0) return prev;
+      const next = prev.slice();
+      const last = next[next.length - 1];
+      if (last.role === 'jarvis') next[next.length - 1] = { ...last, errorMessage: message };
       return next;
     });
   }, []);
@@ -274,11 +279,11 @@ export function useChat(): UseChatResult {
             appendDelta(delta);
           } else if (frame.event === 'error') {
             const { message } = JSON.parse(frame.data) as { message: string };
-            setError(message);
+            setLastMessageError(message);
           }
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Something went wrong.');
+        setLastMessageError(e instanceof Error ? e.message : 'Something went wrong.');
       } finally {
         streamingRef.current = false;
         setStreaming(false);
@@ -288,7 +293,7 @@ export function useChat(): UseChatResult {
         }
       }
     },
-    [authFetch, authFetchStream, appendDelta, setActive, refreshConversations, pollForTitle],
+    [authFetch, authFetchStream, appendDelta, setLastMessageError, setActive, refreshConversations, pollForTitle],
   );
 
   return {

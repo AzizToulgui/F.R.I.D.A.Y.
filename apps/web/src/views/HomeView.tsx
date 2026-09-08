@@ -11,6 +11,7 @@ interface HomeViewProps {
   onOpenVoice: () => void;
   onOpenTools: () => void;
   onSuggestion: (text: string) => void;
+  streaming?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -20,7 +21,15 @@ const SUGGESTIONS = [
   { title: 'Analyze a document', sub: 'Drop a file to begin', text: 'Summarize the document I just uploaded.' },
 ];
 
-export function HomeView({ draft, onDraftChange, onSend, onOpenVoice, onOpenTools, onSuggestion }: HomeViewProps) {
+export function HomeView({
+  draft,
+  onDraftChange,
+  onSend,
+  onOpenVoice,
+  onOpenTools,
+  onSuggestion,
+  streaming,
+}: HomeViewProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6">
       <Persona
@@ -40,6 +49,7 @@ export function HomeView({ draft, onDraftChange, onSend, onOpenVoice, onOpenTool
           onSend={onSend}
           onOpenVoice={onOpenVoice}
           onOpenTools={onOpenTools}
+          streaming={streaming}
         />
 
         <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-2">

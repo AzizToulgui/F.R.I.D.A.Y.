@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FunctionCallRequest, FunctionCallResponse } from '../ai-provider/ai-provider.types';
+import { UsersService } from '../users/users.service';
 import { ToolInvocation, ToolInvocationStatus } from './entities/tool-invocation.entity';
 import { ToolContext } from './tool.interface';
 import { ToolRegistryService } from './tool-registry.service';
@@ -23,6 +24,7 @@ export class ToolExecutionService {
 
   constructor(
     private readonly registry: ToolRegistryService,
+    private readonly usersService: UsersService,
     @InjectRepository(ToolInvocation)
     private readonly invocationsRepository: Repository<ToolInvocation>,
   ) {}
@@ -38,6 +40,17 @@ export class ToolExecutionService {
     const tool = this.registry.get(name);
     if (!tool) {
       return { error: `Unknown tool "${name}".` };
+    }
+
+    // Defense in depth: a disabled tool is already excluded from what
+    // ToolRegistryService.getDeclarations offers Gemini (see
+    // ConversationEngineService/LiveController), but this catches a call
+    // that still slips through - e.g. a Live session's tool set was locked
+    // in before the user flipped the switch.
+    const user = await this.usersService.findById(ctx.userId);
+    if (user?.disabledTools.includes(name)) {
+      await this.audit(ctx, name, rawArgs, { blocked: 'tool_disabled' }, ToolInvocationStatus.BLOCKED);
+      return { error: `"${name}" is turned off in Settings.` };
     }
 
     const parsed = tool.parameters.safeParse(rawArgs ?? {});

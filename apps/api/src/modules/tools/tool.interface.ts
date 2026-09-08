@@ -24,6 +24,12 @@ export interface ToolDefinition<TArgs = unknown> {
   // reminder") - none of the Step 10 starting tools need this, but the gate
   // exists so a future tool can opt in without touching ToolExecutionService.
   readonly requiresConfirmation: boolean;
+  // Restricts which channel(s) a tool is offered on - undefined means both
+  // (every tool predating this field). Voice-only tools (e.g. the voice memo
+  // record/play tools) rely on client-side capabilities (mic access) that
+  // text chat has no equivalent for, so they'd otherwise appear as a
+  // function the model could call and get a confusing stub result back.
+  readonly channels?: ('text' | 'voice')[];
   execute(ctx: ToolContext, args: TArgs): Promise<unknown>;
 }
 

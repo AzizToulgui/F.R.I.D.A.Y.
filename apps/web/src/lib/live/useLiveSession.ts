@@ -11,6 +11,18 @@ interface InvokeToolResponse {
   output?: unknown;
 }
 
+interface VoiceMemoRecord {
+  id: string;
+  label: string | null;
+  durationMs: number;
+  createdAt?: string;
+}
+
+// Safety net for record_voice_memo: auto-stops (and saves) a forgotten
+// recording rather than letting it grow unbounded - see the manual Stop
+// Recording control (stopRecordingMemo) for the primary, dependable path.
+const MAX_MEMO_DURATION_MS = 120_000;
+
 // getUserMedia rejects with a named DOMException - the generic
 // "Permission denied" message it carries doesn't tell the user what to do
 // about it, so map the cases worth distinguishing to actionable copy.
@@ -48,10 +60,14 @@ export interface UseLiveSessionResult {
   getMicLevel: () => number;
   /** Current model output level, 0-1 - polled from an animation loop, not reactive state. */
   getOutputLevel: () => number;
+  /** True while a personal voice memo (record_voice_memo) is being recorded. */
+  recordingMemo: boolean;
+  /** Manually stops and saves the in-progress voice memo - the dependable path, independent of the model hearing a spoken cue. */
+  stopRecordingMemo: () => void;
 }
 
 export function useLiveSession(): UseLiveSessionResult {
-  const { authFetch } = useAuth();
+  const { authFetch, authFetchStream } = useAuth();
   const [state, setState] = useState<LiveConnectionState>('idle');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -61,11 +77,71 @@ export function useLiveSession(): UseLiveSessionResult {
   const [interimCaption, setInterimCaption] = useState('');
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [muted, setMuted] = useState(false);
+  const [recordingMemo, setRecordingMemo] = useState(false);
 
   const clientRef = useRef<LiveClient | null>(null);
   const captureRef = useRef<AudioCapture | null>(null);
   const playbackRef = useRef<AudioPlayback | null>(null);
   const interruptedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const memoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const memoLabelRef = useRef<string | undefined>(undefined);
+
+  // Stops teeing mic chunks (see AudioCapture.stopMemoRecording), uploads the
+  // resulting WAV, and clears the safety-net timeout - shared by both the
+  // model-invoked stop_recording_voice_memo tool call and the manual Stop
+  // Recording button (stopRecordingMemo).
+  const uploadMemo = useCallback(
+    async (label: string | undefined): Promise<VoiceMemoRecord | null> => {
+      if (memoTimeoutRef.current) {
+        clearTimeout(memoTimeoutRef.current);
+        memoTimeoutRef.current = null;
+      }
+      const recording = captureRef.current?.stopMemoRecording() ?? null;
+      setRecordingMemo(false);
+      if (!recording) return null;
+
+      const formData = new FormData();
+      formData.append('file', recording.blob, 'memo.wav');
+      formData.append('durationMs', String(recording.durationMs));
+      formData.append('sampleRateHz', String(recording.sampleRateHz));
+      if (label) formData.append('label', label);
+
+      return authFetch<VoiceMemoRecord>('/voice-memos', { method: 'POST', body: formData });
+    },
+    [authFetch],
+  );
+
+  const playMemo = useCallback(
+    async (args: { id?: string; label?: string }): Promise<{ status: string; id: string; label: string | null }> => {
+      let id = args.id;
+      let label: string | null = null;
+
+      if (!id) {
+        const memos = await authFetch<VoiceMemoRecord[]>('/voice-memos');
+        if (memos.length === 0) throw new Error('No voice memos are saved yet.');
+        const wanted = args.label?.toLowerCase();
+        const match = wanted ? memos.find((m) => m.label?.toLowerCase().includes(wanted)) : undefined;
+        const chosen = match ?? memos[0];
+        id = chosen.id;
+        label = chosen.label;
+      }
+
+      const response = await authFetchStream(`/voice-memos/${encodeURIComponent(id)}/audio`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.addEventListener('ended', () => URL.revokeObjectURL(url), { once: true });
+      await audio.play();
+      return { status: 'playing', id, label };
+    },
+    [authFetch, authFetchStream],
+  );
+
+  // Manual stop (primary path, per the record/stop UX design): independent
+  // of the model correctly hearing a spoken "stop" cue.
+  const stopRecordingMemo = useCallback(() => {
+    void uploadMemo(memoLabelRef.current);
+  }, [uploadMemo]);
 
   const ensureClient = useCallback(() => {
     if (clientRef.current) return clientRef.current;
@@ -75,9 +151,62 @@ export function useLiveSession(): UseLiveSessionResult {
     // result (or any failure - network, validation, unknown tool) into a
     // FunctionResponse - see ARCHITECTURE.md Section 3's tool calling relay.
     // This hook never decides whether a call is allowed; ToolExecutionService does.
+    // The three voice-memo tool names are intercepted here instead: the
+    // backend never sees Live audio at all (see LiveController), so
+    // recording/playback has to happen in the browser.
     const executeToolCalls = async (calls: LiveFunctionCall[]): Promise<LiveFunctionResponse[]> => {
       return Promise.all(
         calls.map(async (call): Promise<LiveFunctionResponse> => {
+          if (call.name === 'record_voice_memo') {
+            try {
+              captureRef.current?.startMemoRecording();
+              memoLabelRef.current = typeof call.args.label === 'string' ? call.args.label : undefined;
+              setRecordingMemo(true);
+              if (memoTimeoutRef.current) clearTimeout(memoTimeoutRef.current);
+              memoTimeoutRef.current = setTimeout(() => {
+                void uploadMemo(memoLabelRef.current);
+              }, MAX_MEMO_DURATION_MS);
+              return { name: call.name, id: call.id, response: { output: { status: 'recording_started' } } };
+            } catch (e) {
+              return {
+                name: call.name,
+                id: call.id,
+                response: { error: e instanceof Error ? e.message : 'Could not start recording.' },
+              };
+            }
+          }
+
+          if (call.name === 'stop_recording_voice_memo') {
+            try {
+              const memo = await uploadMemo(memoLabelRef.current);
+              if (!memo) {
+                return { name: call.name, id: call.id, response: { error: 'No recording was in progress.' } };
+              }
+              return { name: call.name, id: call.id, response: { output: memo } };
+            } catch (e) {
+              return {
+                name: call.name,
+                id: call.id,
+                response: { error: e instanceof Error ? e.message : 'Could not save the recording.' },
+              };
+            }
+          }
+
+          if (call.name === 'play_voice_memo') {
+            try {
+              const id = typeof call.args.id === 'string' ? call.args.id : undefined;
+              const label = typeof call.args.label === 'string' ? call.args.label : undefined;
+              const played = await playMemo({ id, label });
+              return { name: call.name, id: call.id, response: { output: played } };
+            } catch (e) {
+              return {
+                name: call.name,
+                id: call.id,
+                response: { error: e instanceof Error ? e.message : 'Could not play the memo.' },
+              };
+            }
+          }
+
           try {
             const result = await authFetch<InvokeToolResponse>(`/tools/${encodeURIComponent(call.name)}/invoke`, {
               method: 'POST',
@@ -150,7 +279,7 @@ export function useLiveSession(): UseLiveSessionResult {
     });
     clientRef.current = client;
     return client;
-  }, [authFetch]);
+  }, [authFetch, uploadMemo, playMemo]);
 
   const start = useCallback(async () => {
     setErrorMessage(null);
@@ -186,6 +315,11 @@ export function useLiveSession(): UseLiveSessionResult {
   }, [ensureClient]);
 
   const stop = useCallback(() => {
+    if (memoTimeoutRef.current) {
+      clearTimeout(memoTimeoutRef.current);
+      memoTimeoutRef.current = null;
+    }
+    setRecordingMemo(false);
     captureRef.current?.stop();
     captureRef.current = null;
     clientRef.current?.disconnect();
@@ -230,5 +364,7 @@ export function useLiveSession(): UseLiveSessionResult {
     stop,
     getMicLevel,
     getOutputLevel,
+    recordingMemo,
+    stopRecordingMemo,
   };
 }

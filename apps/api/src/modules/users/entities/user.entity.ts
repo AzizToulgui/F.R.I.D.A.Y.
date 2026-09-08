@@ -13,9 +13,11 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 255 })
   email!: string;
 
+  // Null for accounts created via "Continue with Google" that never set a
+  // password - see AuthService.validateCredentials for the login-side guard.
   @Exclude()
-  @Column({ name: 'password_hash', type: 'text' })
-  passwordHash!: string;
+  @Column({ name: 'password_hash', type: 'text', nullable: true })
+  passwordHash!: string | null;
 
   @Column({ name: 'display_name', type: 'varchar', length: 120 })
   displayName!: string;
@@ -32,6 +34,13 @@ export class User extends BaseEntity {
 
   @Column({ name: 'voice_delivery_style', type: 'varchar', length: 64, nullable: true })
   voiceDeliveryStyle!: string | null;
+
+  // Tool names the user has switched off in Settings/Tools (see ToolsView) -
+  // filtered out of ToolRegistryService.getDeclarations before either
+  // ConversationEngineService or LiveController offers tools to Gemini, and
+  // re-checked in ToolExecutionService.invoke as defense in depth.
+  @Column({ name: 'disabled_tools', type: 'text', array: true, default: () => "'{}'" })
+  disabledTools!: string[];
 
   @OneToMany(() => RefreshToken, (token) => token.user)
   refreshTokens?: RefreshToken[];

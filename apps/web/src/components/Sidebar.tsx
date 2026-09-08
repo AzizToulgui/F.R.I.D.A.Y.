@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
+  BellIcon,
   BrainIcon,
   ChevronLeftIcon,
   LibraryIcon,
@@ -10,9 +11,10 @@ import {
   PowerIcon,
   SearchIcon,
   SettingsIcon,
+  StickyNoteIcon,
   Trash2Icon,
   WrenchIcon,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,13 +24,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import type { ConversationSummary } from '@/lib/chat/useChat';
-import type { Route } from '@/types';
-import { useAuth } from '@/lib/auth/AuthProvider';
+} from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import type { ConversationSummary } from "@/lib/chat/useChat";
+import type { Route } from "@/types";
+import { useAuth } from "@/lib/auth/AuthProvider";
 
 interface SidebarProps {
   open: boolean;
@@ -46,28 +48,31 @@ interface SidebarProps {
 }
 
 const navItemBase =
-  'flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 py-2 text-left text-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground';
-const navItemActive = 'bg-accent text-accent-foreground';
+  "flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 py-2 text-left text-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground";
+const navItemActive = "bg-accent text-accent-foreground";
 
 const historyItemBase =
-  'group flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 py-[7px] text-left text-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground';
-const historyItemActive = 'bg-accent text-accent-foreground';
+  "group flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 py-[7px] text-left text-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground";
+const historyItemActive = "bg-accent text-accent-foreground";
 
-type DateGroup = 'Today' | 'Yesterday' | 'Earlier';
-const DATE_GROUPS: DateGroup[] = ['Today', 'Yesterday', 'Earlier'];
+type DateGroup = "Today" | "Yesterday" | "Earlier";
+const DATE_GROUPS: DateGroup[] = ["Today", "Yesterday", "Earlier"];
 
 function dateGroup(iso: string): DateGroup {
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const diffDays = Math.round((startOfDay(new Date()) - startOfDay(new Date(iso))) / 86_400_000);
-  if (diffDays <= 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  return 'Earlier';
+  const startOfDay = (d: Date) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round(
+    (startOfDay(new Date()) - startOfDay(new Date(iso))) / 86_400_000,
+  );
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return "Earlier";
 }
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  return (parts[0][0] + (parts[1]?.[0] ?? '')).toUpperCase();
+  if (parts.length === 0) return "?";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
 export function Sidebar({
@@ -86,8 +91,9 @@ export function Sidebar({
 }: SidebarProps) {
   const { user, logout } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
-  const [pendingDelete, setPendingDelete] = useState<ConversationSummary | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [pendingDelete, setPendingDelete] =
+    useState<ConversationSummary | null>(null);
 
   const startEditing = (c: ConversationSummary) => {
     setEditingId(c.id);
@@ -110,7 +116,7 @@ export function Sidebar({
     <>
       <aside
         className={`flex flex-none flex-col overflow-hidden border-r bg-sidebar text-sidebar-foreground transition-[width] duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${
-          open ? 'w-64' : 'w-0'
+          open ? "w-64" : "w-0"
         }`}
       >
         <div className="flex h-14 flex-none items-center gap-2.5 border-b px-3.5">
@@ -134,10 +140,20 @@ export function Sidebar({
         </div>
 
         <div className="flex flex-col gap-1.5 p-3">
-          <Button type="button" variant="outline" onClick={onNewChat} className="justify-start">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onNewChat}
+            className="justify-start"
+          >
             <PlusIcon /> New conversation
           </Button>
-          <Button type="button" variant="ghost" onClick={onOpenSearch} className="justify-start text-muted-foreground">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onOpenSearch}
+            className="justify-start text-muted-foreground"
+          >
             <SearchIcon /> Search
             <kbd className="ml-auto rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
               ⌘K
@@ -148,36 +164,57 @@ export function Sidebar({
         <nav className="flex flex-col gap-0.5 px-3 pb-2.5">
           <button
             type="button"
-            onClick={() => onNavigate('memory')}
-            className={`${navItemBase} ${route === 'memory' ? navItemActive : ''}`}
+            onClick={() => onNavigate("memory")}
+            className={`${navItemBase} ${route === "memory" ? navItemActive : ""}`}
           >
             <BrainIcon className="size-4" /> Memory
-            <span className="ml-auto font-mono text-[10px] text-muted-foreground">24</span>
+            <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+              24
+            </span>
           </button>
           <button
             type="button"
-            onClick={() => onNavigate('knowledge')}
-            className={`${navItemBase} ${route === 'knowledge' ? navItemActive : ''}`}
+            onClick={() => onNavigate("knowledge")}
+            className={`${navItemBase} ${route === "knowledge" ? navItemActive : ""}`}
           >
             <LibraryIcon className="size-4" /> Knowledge
-            <span className="ml-auto font-mono text-[10px] text-muted-foreground">6</span>
+            <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+              6
+            </span>
           </button>
           <button
             type="button"
-            onClick={() => onNavigate('tools')}
-            className={`${navItemBase} ${route === 'tools' ? navItemActive : ''}`}
+            onClick={() => onNavigate("tools")}
+            className={`${navItemBase} ${route === "tools" ? navItemActive : ""}`}
           >
             <WrenchIcon className="size-4" /> Tools
-            <span className="ml-auto h-[5px] w-[5px] rounded-full bg-primary" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate("reminders")}
+            className={`${navItemBase} ${route === "reminders" ? navItemActive : ""}`}
+          >
+            <BellIcon className="size-4" /> Reminders
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate("notes")}
+            className={`${navItemBase} ${route === "notes" ? navItemActive : ""}`}
+          >
+            <StickyNoteIcon className="size-4" /> Notes
           </button>
         </nav>
 
         <div className="flex-1 overflow-y-auto px-3 pt-1.5 pb-3">
           {conversations.length === 0 ? (
-            <div className="px-2.5 py-2.5 text-xs text-muted-foreground">No conversations yet</div>
+            <div className="px-2.5 py-2.5 text-xs text-muted-foreground">
+              No conversations yet
+            </div>
           ) : (
             DATE_GROUPS.map((group) => {
-              const items = conversations.filter((c) => dateGroup(c.updatedAt) === group);
+              const items = conversations.filter(
+                (c) => dateGroup(c.updatedAt) === group,
+              );
               if (items.length === 0) return null;
               return (
                 <div key={group}>
@@ -186,15 +223,18 @@ export function Sidebar({
                   </div>
                   {items.map((c) =>
                     editingId === c.id ? (
-                      <div key={c.id} className="flex w-full items-center gap-2 rounded-md px-2.5 py-[5px]">
+                      <div
+                        key={c.id}
+                        className="flex w-full items-center gap-2 rounded-md px-2.5 py-[5px]"
+                      >
                         <Input
                           autoFocus
                           value={editingTitle}
                           onChange={(e) => setEditingTitle(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') commitEdit();
-                            else if (e.key === 'Escape') cancelEdit();
+                            if (e.key === "Enter") commitEdit();
+                            else if (e.key === "Escape") cancelEdit();
                           }}
                           onBlur={commitEdit}
                           className="h-7 text-sm"
@@ -206,10 +246,14 @@ export function Sidebar({
                         type="button"
                         onClick={() => onSelectConversation(c.id)}
                         className={`${historyItemBase} ${
-                          route === 'chat' && activeConversationId === c.id ? historyItemActive : ''
+                          route === "chat" && activeConversationId === c.id
+                            ? historyItemActive
+                            : ""
                         }`}
                       >
-                        <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {c.title}
+                        </span>
                         <span
                           role="button"
                           aria-label={`Rename "${c.title}"`}
@@ -244,32 +288,50 @@ export function Sidebar({
         <div className="flex flex-none items-center gap-2.5 border-t px-3 py-2.5">
           <Avatar size="sm">
             <AvatarFallback className="font-mono text-[11px]">
-              {initials(user?.displayName ?? user?.email ?? '?')}
+              {initials(user?.displayName ?? user?.email ?? "?")}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
             <div className="overflow-hidden text-[12.5px] text-ellipsis whitespace-nowrap text-foreground">
-              {user?.displayName ?? user?.email ?? 'Signed out'}
+              {user?.displayName ?? user?.email ?? "Signed out"}
             </div>
-            <div className="font-mono text-[10.5px] text-muted-foreground">GEMINI 2.5</div>
+            <div className="font-mono text-[10.5px] text-muted-foreground">
+              GEMINI 2.5
+            </div>
           </div>
           <div className="ml-auto flex items-center gap-1">
-            <Button type="button" variant="ghost" size="icon-sm" onClick={() => void logout()} aria-label="Log out">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => void logout()}
+              aria-label="Log out"
+            >
               <PowerIcon />
             </Button>
-            <Button type="button" variant="ghost" size="icon-sm" onClick={onOpenSettings} aria-label="Settings">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={onOpenSettings}
+              aria-label="Settings"
+            >
               <SettingsIcon />
             </Button>
           </div>
         </div>
       </aside>
 
-      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{pendingDelete?.title}&rdquo; will be permanently deleted. This can&rsquo;t be undone.
+              &ldquo;{pendingDelete?.title}&rdquo; will be permanently deleted.
+              This can&rsquo;t be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

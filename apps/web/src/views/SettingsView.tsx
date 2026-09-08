@@ -1,18 +1,21 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CheckIcon, Loader2Icon, PlayIcon } from 'lucide-react';
+import { CheckIcon, Loader2Icon, PlayIcon, SquareIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { applyTtsSettings, DEFAULT_TTS_SETTINGS, loadTtsSettings, saveTtsSettings, useSpeechVoices } from '@/lib/tts/ttsSettings';
+import type { TtsSettings } from '@/lib/tts/ttsSettings';
 import type { Theme } from '@/types';
 
 interface SettingsViewProps {
   theme: Theme;
   onSetTheme: (theme: Theme) => void;
   onClose: () => void;
+  initialTab?: string;
 }
 
 const NAV_ITEMS = ['Appearance', 'Account', 'Voice', 'Language', 'Memory', 'Privacy', 'Notifications', 'Security'];
@@ -65,6 +68,97 @@ function EqualizerIcon() {
         />
       ))}
     </span>
+  );
+}
+
+interface GoogleStatus {
+  connected: boolean;
+  email?: string;
+  scopes?: string[];
+}
+
+function AccountPanel() {
+  const { authFetch } = useAuth();
+  const [status, setStatus] = useState<GoogleStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authFetch<GoogleStatus>('/google/status');
+        if (!cancelled) setStatus(res);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load Google account status.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authFetch]);
+
+  const connect = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { url } = await authFetch<{ url: string }>('/google/authorize/connect', { method: 'POST' });
+      window.location.href = url;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start Google sign-in.');
+      setBusy(false);
+    }
+  };
+
+  const disconnect = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await authFetch('/google', { method: 'DELETE' });
+      setStatus({ connected: false });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not disconnect Google account.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <h1 className="m-0 mb-1 text-xl font-medium text-foreground">Account</h1>
+      <p className="m-0 mb-5 text-sm text-muted-foreground">
+        Connect Google to let JARVIS see unread email, manage your calendar, and search the web.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2Icon className="size-4 animate-spin" /> Checking connection…
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 rounded-xl border bg-card p-4">
+          <div className="flex-1">
+            <div className="text-sm font-medium text-foreground">Google</div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              {status?.connected ? `Connected as ${status.email}` : 'Not connected'}
+            </div>
+          </div>
+          {status?.connected ? (
+            <Button type="button" variant="outline" disabled={busy} onClick={disconnect}>
+              {busy ? 'Disconnecting…' : 'Disconnect'}
+            </Button>
+          ) : (
+            <Button type="button" disabled={busy} onClick={connect}>
+              {busy ? 'Redirecting…' : 'Connect'}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {error && <div className="mt-3 text-[12.5px] text-destructive">{error}</div>}
+    </div>
   );
 }
 
@@ -169,7 +263,7 @@ function VoicePanel() {
     <div>
       <h1 className="m-0 mb-1 text-xl font-medium text-foreground">Voice</h1>
       <p className="m-0 mb-5 text-sm text-muted-foreground">
-        Applies to voice mode - Gemini's spoken voice and how it paces and phrases what it says.
+        Applies to voice mode - Gemini&rsquo;s spoken voice and how it paces and phrases what it says.
       </p>
 
       {error && <div className="mb-3 text-sm text-destructive">{error}</div>}
@@ -282,8 +376,135 @@ function VoicePanel() {
   );
 }
 
-export function SettingsView({ theme, onSetTheme, onClose }: SettingsViewProps) {
-  const [active, setActive] = useState('Appearance');
+const PREVIEW_TEXT = "This is a preview of your read-aloud voice.";
+
+/** Settings for the browser-native "Read aloud" button on chat responses - a separate TTS engine from JARVIS's own spoken voice above, so it gets its own controls and its own (client-only, localStorage-backed) settings. */
+function ReadAloudPanel() {
+  const voices = useSpeechVoices();
+  const [settings, setSettings] = useState<TtsSettings>(DEFAULT_TTS_SETTINGS);
+  const [previewing, setPreviewing] = useState(false);
+  const supported = typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+  // Loaded post-mount (not during render) to avoid an SSR/client hydration
+  // mismatch, matching the pattern used for navigator.share detection
+  // elsewhere - deferred via queueMicrotask for the same lint rule.
+  useEffect(() => {
+    queueMicrotask(() => setSettings(loadTtsSettings()));
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (supported) window.speechSynthesis.cancel();
+    };
+  }, [supported]);
+
+  const persist = (patch: Partial<TtsSettings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...patch };
+      saveTtsSettings(next);
+      return next;
+    });
+  };
+
+  const togglePreview = () => {
+    if (!supported) return;
+    if (previewing) {
+      window.speechSynthesis.cancel();
+      setPreviewing(false);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(PREVIEW_TEXT);
+    applyTtsSettings(utterance, settings);
+    utterance.onend = () => setPreviewing(false);
+    utterance.onerror = () => setPreviewing(false);
+    window.speechSynthesis.speak(utterance);
+    setPreviewing(true);
+  };
+
+  return (
+    <div className="mt-4 flex flex-col border-t pt-4">
+      <div className="text-sm font-medium text-foreground">Read responses aloud</div>
+      <div className="mt-1 mb-3 text-sm text-muted-foreground">
+        Powers the &ldquo;Read aloud&rdquo; button on chat responses, using your browser&rsquo;s built-in text-to-speech.
+      </div>
+
+      {!supported ? (
+        <div className="text-sm text-muted-foreground">Not supported in this browser.</div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-14 flex-none text-sm text-muted-foreground">Voice</div>
+            <Select
+              value={settings.voiceURI ?? 'default'}
+              onValueChange={(value) => persist({ voiceURI: value === 'default' ? null : (value as string) })}
+            >
+              <SelectTrigger aria-label="Read-aloud voice" className="w-[260px]">
+                <SelectValue>
+                  {(value: string) =>
+                    value === 'default'
+                      ? 'Browser default'
+                      : (voices.find((v) => v.voiceURI === value)?.name ?? 'Browser default')
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Browser default</SelectItem>
+                {voices.map((v) => (
+                  <SelectItem key={v.voiceURI} value={v.voiceURI}>
+                    {v.name} ({v.lang})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="outline"
+              onClick={togglePreview}
+              aria-label={previewing ? 'Stop preview' : 'Preview voice'}
+            >
+              {previewing ? <SquareIcon className="size-3.5" /> : <PlayIcon className="size-3.5 translate-x-[1px]" />}
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="w-14 flex-none text-sm text-muted-foreground">Speed</div>
+            <input
+              type="range"
+              min={0.5}
+              max={2}
+              step={0.1}
+              value={settings.rate}
+              onChange={(e) => persist({ rate: Number(e.target.value) })}
+              className="h-1.5 flex-1 accent-primary"
+              aria-label="Read-aloud speed"
+            />
+            <span className="w-10 flex-none text-right text-xs text-muted-foreground">{settings.rate.toFixed(1)}×</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="w-14 flex-none text-sm text-muted-foreground">Pitch</div>
+            <input
+              type="range"
+              min={0}
+              max={2}
+              step={0.1}
+              value={settings.pitch}
+              onChange={(e) => persist({ pitch: Number(e.target.value) })}
+              className="h-1.5 flex-1 accent-primary"
+              aria-label="Read-aloud pitch"
+            />
+            <span className="w-10 flex-none text-right text-xs text-muted-foreground">{settings.pitch.toFixed(1)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SettingsView({ theme, onSetTheme, onClose, initialTab }: SettingsViewProps) {
+  const [active, setActive] = useState(initialTab ?? 'Appearance');
   const [toggles, setToggles] = useState<Record<string, boolean>>(
     Object.fromEntries(TOGGLES.map((t) => [t.key, t.defaultOn])),
   );
@@ -380,9 +601,16 @@ export function SettingsView({ theme, onSetTheme, onClose }: SettingsViewProps) 
               </div>
             )}
 
-            {active === 'Voice' && <VoicePanel />}
+            {active === 'Voice' && (
+              <div>
+                <VoicePanel />
+                <ReadAloudPanel />
+              </div>
+            )}
 
-            {active !== 'Appearance' && active !== 'Voice' && (
+            {active === 'Account' && <AccountPanel />}
+
+            {active !== 'Appearance' && active !== 'Voice' && active !== 'Account' && (
               <div>
                 <h1 className="m-0 mb-1 text-xl font-medium text-foreground">{active}</h1>
                 <p className="m-0 text-sm text-muted-foreground">Coming soon.</p>

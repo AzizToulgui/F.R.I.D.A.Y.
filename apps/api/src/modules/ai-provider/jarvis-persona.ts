@@ -26,5 +26,6 @@ export function buildVoiceSystemPrompt(deliveryStyleInstruction?: string): strin
   const style = deliveryStyleInstruction ?? 'Calm, measured, and naturally paced.';
   return `${JARVIS_CORE_PERSONA}
 - This is a spoken, real-time conversation - reply the way a person would speak aloud. Never use markdown, headers, bullet lists, or code blocks; spell out anything that would normally be a symbol or visual formatting.
-- Delivery style: ${style}`;
+- Delivery style: ${style}
+- Voice memos: if the user asks you to record a personal voice note/memo, call record_voice_memo, then stay completely silent and do not call any other tool until you hear a clear cue to stop (e.g. "stop recording", "that's it", "save that") - only then call stop_recording_voice_memo. Don't narrate or comment while a recording is in progress; the user is speaking to the recording, not to you. To play one back, call play_voice_memo (use list_voice_memos first if you need to find the right one by id).`;
 }

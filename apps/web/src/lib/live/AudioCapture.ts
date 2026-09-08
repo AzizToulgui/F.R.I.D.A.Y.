@@ -5,11 +5,49 @@ function bufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
+/** Wraps raw PCM16 mono samples in a minimal 44-byte WAV header - no encoder library needed for this format. */
+function encodeWav(samples: Int16Array, sampleRateHz: number): Blob {
+  const bytesPerSample = 2;
+  const blockAlign = bytesPerSample; // mono
+  const byteRate = sampleRateHz * blockAlign;
+  const dataSize = samples.length * bytesPerSample;
+
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  const writeString = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i));
+  };
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true); // fmt chunk size
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRateHz, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true); // bits per sample
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  new Int16Array(buffer, 44).set(samples);
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+export interface VoiceMemoRecording {
+  blob: Blob;
+  sampleRateHz: number;
+  durationMs: number;
+}
+
 /**
  * Captures the microphone as 16kHz mono PCM16 chunks (the format Gemini
  * Live's `sendRealtimeInput` expects) via an AudioWorklet, and never routes
  * the raw stream anywhere else - no recording, no upload except through the
- * caller-supplied chunk callback.
+ * caller-supplied chunk callback (and the opt-in memo tee below, used only
+ * while a personal voice memo is actively being recorded).
  */
 export class AudioCapture {
   private context: AudioContext | null = null;
@@ -18,6 +56,7 @@ export class AudioCapture {
   private worklet: AudioWorkletNode | null = null;
   private analyser: AnalyserNode | null = null;
   private levelData: Uint8Array<ArrayBuffer> | null = null;
+  private memoChunks: Int16Array[] | null = null;
 
   async start(onChunk: (base64Pcm16Mono16k: string) => void): Promise<void> {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -46,6 +85,12 @@ export class AudioCapture {
     this.worklet = new AudioWorkletNode(this.context, 'pcm-capture-processor');
     this.worklet.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
       onChunk(bufferToBase64(event.data));
+      // Tees the same already-flowing chunks into a buffer while a voice
+      // memo is being recorded - doesn't touch getUserMedia again, and never
+      // affects the Gemini streaming path above.
+      if (this.memoChunks) {
+        this.memoChunks.push(new Int16Array(event.data));
+      }
     };
     // Deliberately not connected to `context.destination` - we must not
     // play the user's own mic back to them.
@@ -78,6 +123,33 @@ export class AudioCapture {
     return Math.sqrt(sumSquares / this.levelData.length);
   }
 
+  /** Starts teeing chunks for a personal voice memo - mic streaming to Gemini is unaffected. */
+  startMemoRecording(): void {
+    this.memoChunks = [];
+  }
+
+  /** Stops teeing and returns the recorded memo as a WAV blob, or null if none was in progress. */
+  stopMemoRecording(): VoiceMemoRecording | null {
+    if (!this.memoChunks) return null;
+    const chunks = this.memoChunks;
+    this.memoChunks = null;
+
+    const totalSamples = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const samples = new Int16Array(totalSamples);
+    let offset = 0;
+    for (const chunk of chunks) {
+      samples.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    const sampleRateHz = this.context?.sampleRate ?? 16000;
+    return {
+      blob: encodeWav(samples, sampleRateHz),
+      sampleRateHz,
+      durationMs: Math.round((totalSamples / sampleRateHz) * 1000),
+    };
+  }
+
   stop(): void {
     this.analyser?.disconnect();
     this.worklet?.disconnect();
@@ -90,5 +162,6 @@ export class AudioCapture {
     this.source = null;
     this.stream = null;
     this.context = null;
+    this.memoChunks = null;
   }
 }

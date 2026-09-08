@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
-import { CommandIcon, MicIcon, PlusIcon } from 'lucide-react';
+import { CommandIcon, Loader2Icon, MicIcon, PlusIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/lib/auth/AuthProvider';
@@ -21,6 +21,8 @@ interface MessageComposerProps {
   onSend: () => void;
   onOpenVoice: () => void;
   onOpenTools: () => void;
+  /** True while a reply is being generated - disables Send and shows a spinner instead of blocking silently. */
+  streaming?: boolean;
 }
 
 const ACCEPTED_EXTENSIONS = '.pdf,.docx,.md,.markdown,.txt';
@@ -30,7 +32,14 @@ const ACCEPTED_EXTENSIONS = '.pdf,.docx,.md,.markdown,.txt';
  * so the "attach a document" and "tool count" wiring (both of which call the
  * real backend) live in exactly one place instead of two copies drifting apart.
  */
-export function MessageComposer({ draft, onDraftChange, onSend, onOpenVoice, onOpenTools }: MessageComposerProps) {
+export function MessageComposer({
+  draft,
+  onDraftChange,
+  onSend,
+  onOpenVoice,
+  onOpenTools,
+  streaming = false,
+}: MessageComposerProps) {
   const { authFetch } = useAuth();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,7 +65,7 @@ export function MessageComposer({ draft, onDraftChange, onSend, onOpenVoice, onO
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      if (!streaming) onSend();
     }
   };
 
@@ -124,8 +133,14 @@ export function MessageComposer({ draft, onDraftChange, onSend, onOpenVoice, onO
             >
               <MicIcon />
             </Button>
-            <Button type="button" onClick={onSend}>
-              Send
+            <Button type="button" onClick={onSend} disabled={streaming} aria-busy={streaming}>
+              {streaming ? (
+                <>
+                  <Loader2Icon className="size-4 animate-spin" /> Sending…
+                </>
+              ) : (
+                'Send'
+              )}
             </Button>
           </div>
         </div>

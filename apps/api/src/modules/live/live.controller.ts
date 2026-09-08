@@ -27,7 +27,7 @@ export class LiveController {
   async createSession(@CurrentUser() user: AuthenticatedUser) {
     this.logger.log(`Minting Gemini Live session token for user ${user.id}`);
     const fullUser = await this.usersService.findById(user.id);
-    return this.aiProvider.mintLiveSessionToken(this.toolRegistry.getDeclarations(), {
+    return this.aiProvider.mintLiveSessionToken(this.toolRegistry.getDeclarations('voice', fullUser?.disabledTools), {
       voiceName: fullUser?.voiceName ?? undefined,
       deliveryStyleInstruction: deliveryStyleInstructionFor(fullUser?.voiceDeliveryStyle),
     });

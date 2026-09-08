@@ -12,6 +12,8 @@ import { Document } from '../modules/documents/entities/document.entity';
 import { Note } from '../modules/notes/entities/note.entity';
 import { Reminder } from '../modules/reminders/entities/reminder.entity';
 import { ToolInvocation } from '../modules/tools/entities/tool-invocation.entity';
+import { GoogleAccount } from '../modules/google/entities/google-account.entity';
+import { VoiceMemo } from '../modules/voice-memos/entities/voice-memo.entity';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { ToolInvocation } from '../modules/tools/entities/tool-invocation.entity
             ToolInvocation,
             Document,
             DocumentChunk,
+            GoogleAccount,
+            VoiceMemo,
           ],
           // Schema changes always go through migrations (see database/migrations),
           // never through sync - even in dev, so local schema drift can't hide bugs

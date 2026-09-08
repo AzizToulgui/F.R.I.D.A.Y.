@@ -45,9 +45,10 @@ export class AuthService {
 
   async validateCredentials(email: string, password: string): Promise<User> {
     const user = await this.usersService.findByEmail(email);
-    // Same generic error whether the email doesn't exist or the password is
-    // wrong - distinguishing them lets an attacker enumerate registered emails.
-    if (!user || !user.isActive) {
+    // Same generic error whether the email doesn't exist, the password is
+    // wrong, or the account is Google-only (no password_hash) - distinguishing
+    // any of these lets an attacker enumerate registered emails / linked accounts.
+    if (!user || !user.isActive || !user.passwordHash) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
