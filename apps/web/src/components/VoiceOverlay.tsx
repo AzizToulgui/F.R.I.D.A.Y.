@@ -1,14 +1,51 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Orb } from './Orb';
+import { MicIcon, MicOffIcon, XIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Persona, type PersonaState } from '@/components/ai-elements/persona';
 import { useLiveSession } from '@/lib/live/useLiveSession';
-import type { OrbMode, Theme } from '@/types';
+import type { OrbMode } from '@/types';
 
 interface VoiceOverlayProps {
-  theme: Theme;
   onClose: () => void;
 }
+
+const PERSONA_STATE_BY_ORB_MODE: Record<OrbMode, PersonaState> = {
+  idle: 'idle',
+  listening: 'listening',
+  thinking: 'thinking',
+  speaking: 'speaking',
+  interrupted: 'listening',
+  error: 'asleep',
+};
+
+const RING_OUTER_CLASS_BY_MODE: Record<OrbMode, string> = {
+  idle: 'opacity-35 animate-[jv-orbit-spin_9s_linear_infinite]',
+  listening: 'opacity-55 animate-[jv-orbit-spin_6s_linear_infinite]',
+  thinking: 'opacity-15 animate-[jv-orbit-spin_22s_linear_infinite]',
+  speaking: 'opacity-90 animate-[jv-orbit-spin_2.6s_linear_infinite]',
+  interrupted: 'opacity-55 animate-[jv-orbit-spin_6s_linear_infinite]',
+  error: 'opacity-10 animate-[jv-orbit-spin_30s_linear_infinite]',
+};
+
+const RING_INNER_CLASS_BY_MODE: Record<OrbMode, string> = {
+  idle: 'opacity-25 animate-[jv-orbit-spin-rev_13s_linear_infinite]',
+  listening: 'opacity-40 animate-[jv-orbit-spin-rev_9s_linear_infinite]',
+  thinking: 'opacity-10 animate-[jv-orbit-spin-rev_28s_linear_infinite]',
+  speaking: 'opacity-75 animate-[jv-orbit-spin-rev_3.8s_linear_infinite]',
+  interrupted: 'opacity-40 animate-[jv-orbit-spin-rev_9s_linear_infinite]',
+  error: 'opacity-8 animate-[jv-orbit-spin-rev_36s_linear_infinite]',
+};
+
+const SMOKE_CLASS_BY_MODE: Record<OrbMode, string> = {
+  idle: 'opacity-45 animate-[jv-smoke-swirl_11s_ease-in-out_infinite]',
+  listening: 'opacity-60 animate-[jv-smoke-swirl_7s_ease-in-out_infinite]',
+  thinking: 'opacity-25 animate-[jv-smoke-swirl_18s_ease-in-out_infinite]',
+  speaking: 'opacity-90 animate-[jv-smoke-swirl_3.4s_ease-in-out_infinite]',
+  interrupted: 'opacity-60 animate-[jv-smoke-swirl_7s_ease-in-out_infinite]',
+  error: 'opacity-15 animate-[jv-smoke-swirl_22s_ease-in-out_infinite]',
+};
 
 const LABELS: Record<OrbMode, [string, string]> = {
   idle: ['Ready when you are', 'IDLE'],
@@ -19,7 +56,7 @@ const LABELS: Record<OrbMode, [string, string]> = {
   error: ["Connection lost", 'SEE STATUS BELOW'],
 };
 
-export function VoiceOverlay({ theme, onClose }: VoiceOverlayProps) {
+export function VoiceOverlay({ onClose }: VoiceOverlayProps) {
   const {
     state,
     statusMessage,
@@ -33,8 +70,6 @@ export function VoiceOverlay({ theme, onClose }: VoiceOverlayProps) {
     toggleMuted,
     start,
     stop,
-    getMicLevel,
-    getOutputLevel,
   } = useLiveSession();
   const [transcriptOn, setTranscriptOn] = useState(true);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -103,36 +138,50 @@ export function VoiceOverlay({ theme, onClose }: VoiceOverlayProps) {
       className="absolute inset-0 z-50 flex animate-[jv-rise_0.2s_ease-out] flex-col outline-none [background:radial-gradient(900px_620px_at_50%_42%,var(--ac-xs),transparent_70%),var(--bg-voice)]"
     >
       <div className="relative flex h-14 flex-none items-center justify-center">
-        <div className="font-mono text-[10.5px] tracking-[0.34em] text-tx4">JARVIS</div>
-        <button
+        <div className="font-mono text-[10.5px] tracking-[0.34em] text-muted-foreground">JARVIS</div>
+        <Button
           type="button"
+          variant="outline"
+          size="icon-sm"
           onClick={onClose}
           aria-label="Exit voice mode"
-          className="absolute right-[18px] flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] border border-line2 bg-transparent text-tx2 hover:border-line3 hover:text-tx"
+          className="absolute right-[18px]"
         >
-          ✕
-        </button>
+          <XIcon />
+        </Button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 overflow-hidden p-2.5">
         <div className="grid min-h-0 w-full flex-1 place-items-center">
-          <Orb
-            mode={orbMode}
-            isLight={theme === 'light'}
-            size="voice"
-            getLevel={orbMode === 'speaking' ? getOutputLevel : orbMode === 'listening' ? getMicLevel : undefined}
-          />
+          <div className="relative flex size-[300px] items-center justify-center">
+            <div
+              className={`absolute inset-0 rounded-full border-2 border-transparent border-t-ac-hi border-r-ac-hi transition-opacity duration-500 ${RING_OUTER_CLASS_BY_MODE[orbMode]}`}
+            />
+            <div
+              className={`absolute inset-[36px] rounded-full border-2 border-transparent border-b-ac-tx border-l-ac-tx transition-opacity duration-500 ${RING_INNER_CLASS_BY_MODE[orbMode]}`}
+            />
+            <Persona
+              variant="opal"
+              state={PERSONA_STATE_BY_ORB_MODE[orbMode]}
+              className="relative size-56 pointer-events-none [filter:grayscale(1)_sepia(1)_hue-rotate(150deg)_saturate(4.5)_brightness(1.15)]"
+            />
+            <div className="pointer-events-none absolute inset-[38px] overflow-hidden rounded-full mix-blend-screen">
+              <div
+                className={`absolute inset-[-60%] bg-[conic-gradient(from_0deg,var(--ac-tx),transparent_30%,var(--ac-hi)_55%,transparent_80%,var(--ac-tx))] blur-xl ${SMOKE_CLASS_BY_MODE[orbMode]}`}
+              />
+            </div>
+          </div>
         </div>
-        <div role="status" aria-live="polite" className="flex-none text-[17px] tracking-[0.01em] text-tx">
+        <div role="status" aria-live="polite" className="flex-none text-[17px] tracking-[0.01em] text-foreground">
           {label}
         </div>
-        <div className="flex-none font-mono text-[10.5px] tracking-[0.2em] text-tx4">{sub}</div>
+        <div className="flex-none font-mono text-[10.5px] tracking-[0.2em] text-muted-foreground">{sub}</div>
         {errorMessage && (
-          <div className="flex-none text-[12.5px] text-danger">
+          <div className="flex-none text-[12.5px] text-destructive">
             {errorMessage}{' '}
-            <button type="button" onClick={() => void start()} className="cursor-pointer underline">
+            <Button type="button" variant="link" size="sm" onClick={() => void start()} className="h-auto p-0 text-destructive">
               Retry
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -142,13 +191,13 @@ export function VoiceOverlay({ theme, onClose }: VoiceOverlayProps) {
           {interimCaption && (
             <div
               dir="auto"
-              className="self-end max-w-[80%] rounded-[14px] rounded-br-[4px] border border-line bg-line px-3.5 py-2.5 text-[13.5px] text-tx2 italic opacity-80"
+              className="self-end max-w-[80%] rounded-[14px] rounded-br-[4px] border bg-muted px-3.5 py-2.5 text-[13.5px] text-muted-foreground italic opacity-80"
             >
               {interimCaption}
             </div>
           )}
           {transcript && (
-            <div dir="auto" className="max-w-[88%] text-[14.5px] leading-relaxed text-tx2">
+            <div dir="auto" className="max-w-[88%] text-[14.5px] leading-relaxed text-muted-foreground">
               {transcript}
             </div>
           )}
@@ -156,33 +205,26 @@ export function VoiceOverlay({ theme, onClose }: VoiceOverlayProps) {
       )}
 
       <div className="flex flex-none items-center justify-center gap-3 px-4 pt-5 pb-[30px]">
-        <button
-          type="button"
-          onClick={() => setTranscriptOn((v) => !v)}
-          className="h-10 cursor-pointer rounded-xl border border-line2 bg-transparent px-[15px] text-[12.5px] text-tx2 hover:border-line3 hover:text-tx"
-        >
+        <Button type="button" variant="outline" onClick={() => setTranscriptOn((v) => !v)} className="h-10 rounded-xl">
           Transcript
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
           onClick={toggleMuted}
           aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}
           aria-pressed={muted}
-          className={`flex h-14 w-14 cursor-pointer items-center justify-center rounded-full border text-[19px] hover:brightness-115 ${
-            muted ? 'border-danger-line bg-danger-bg text-danger' : 'border-ac-m bg-ac-s text-ac-tx'
+          className={`h-14 w-14 rounded-full ${
+            muted ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-primary/40 bg-primary/10 text-primary'
           }`}
         >
-          {muted ? '🔇' : '🎙'}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-10 cursor-pointer rounded-xl border border-danger-line bg-transparent px-[15px] text-[12.5px] text-danger hover:bg-danger-bg"
-        >
+          {muted ? <MicOffIcon className="size-5" /> : <MicIcon className="size-5" />}
+        </Button>
+        <Button type="button" variant="destructive" onClick={onClose} className="h-10 rounded-xl">
           End
-        </button>
+        </Button>
       </div>
-      <div className="flex-none pb-3 text-center font-mono text-[10px] tracking-[0.14em] text-tx5">
+      <div className="flex-none pb-3 text-center font-mono text-[10px] tracking-[0.14em] text-muted-foreground/70">
         SPACE TO MUTE · ESC TO END
       </div>
     </div>

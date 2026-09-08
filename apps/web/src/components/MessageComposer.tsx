@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
+import { CommandIcon, MicIcon, PlusIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/lib/auth/AuthProvider';
 
 interface ToolInfo {
@@ -19,9 +22,6 @@ interface MessageComposerProps {
   onOpenVoice: () => void;
   onOpenTools: () => void;
 }
-
-const pillClass =
-  'flex h-8 cursor-pointer items-center gap-[7px] rounded-[10px] border border-line2 bg-transparent px-[11px] text-[12.5px] text-tx2 hover:border-line3 hover:text-tx';
 
 const ACCEPTED_EXTENSIONS = '.pdf,.docx,.md,.markdown,.txt';
 
@@ -80,9 +80,9 @@ export function MessageComposer({ draft, onDraftChange, onSend, onOpenVoice, onO
 
   return (
     <div>
-      {uploadStatus && <div className="mb-2 text-[12.5px] text-tx3">{uploadStatus}</div>}
-      <div className="overflow-hidden rounded-[18px] border border-line2 bg-panel2 shadow-[0_18px_50px_rgba(0,0,0,0.5),0_0_0_1px_rgba(95,216,255,0.04)_inset]">
-        <textarea
+      {uploadStatus && <div className="mb-2 text-[12.5px] text-muted-foreground">{uploadStatus}</div>}
+      <div className="overflow-hidden rounded-[18px] border bg-card shadow-lg">
+        <Textarea
           ref={textareaRef}
           value={draft}
           onChange={(e) => onDraftChange(e.target.value)}
@@ -91,7 +91,7 @@ export function MessageComposer({ draft, onDraftChange, onSend, onOpenVoice, onO
           dir="auto"
           aria-label="Message JARVIS"
           placeholder="Ask JARVIS anything…  ⏎ to send · ⇧⏎ for a new line"
-          className="max-h-40 min-h-[52px] w-full resize-none border-0 bg-transparent px-[18px] pt-4 pb-1 text-[14.5px] leading-relaxed text-tx outline-none"
+          className="max-h-40 min-h-[52px] resize-none rounded-none border-0 bg-transparent px-[18px] pt-4 pb-1 text-[14.5px] leading-relaxed shadow-none focus-visible:ring-0"
         />
         <div className="flex items-center gap-2 px-3 pt-2 pb-2.5">
           <input
@@ -101,33 +101,32 @@ export function MessageComposer({ draft, onDraftChange, onSend, onOpenVoice, onO
             className="hidden"
             onChange={(e) => void onAttach(e)}
           />
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             aria-label="Attach a document to your knowledge base"
             onClick={() => fileInputRef.current?.click()}
-            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] border border-line2 bg-transparent text-[15px] text-tx2 hover:border-line3 hover:text-tx"
           >
-            ＋
-          </button>
-          <button type="button" onClick={onOpenTools} className={pillClass}>
-            ⌘ Tools {toolCount !== null && <span className="font-mono text-[10px] text-ac">{toolCount}</span>}
-          </button>
+            <PlusIcon />
+          </Button>
+          <Button type="button" variant="outline" onClick={onOpenTools}>
+            <CommandIcon /> Tools {toolCount !== null && <span className="font-mono text-[10px] text-primary">{toolCount}</span>}
+          </Button>
           <div className="ml-auto flex items-center gap-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="icon"
               onClick={onOpenVoice}
               aria-label="Voice mode"
-              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-[10px] border border-ac-m bg-ac-xs text-ac-tx hover:bg-ac-s"
+              className="border-primary/40 bg-primary/10 text-primary hover:bg-primary/15"
             >
-              🎙
-            </button>
-            <button
-              type="button"
-              onClick={onSend}
-              className="h-8 cursor-pointer rounded-[10px] border-0 bg-ac px-4 text-[13px] font-semibold text-ac-fg hover:bg-ac-hi"
-            >
+              <MicIcon />
+            </Button>
+            <Button type="button" onClick={onSend}>
               Send
-            </button>
+            </Button>
           </div>
         </div>
       </div>

@@ -1,6 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { FileTextIcon, UploadIcon } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useAuth } from '@/lib/auth/AuthProvider';
 
 type DocStatus = 'indexing' | 'indexed' | 'error';
@@ -91,19 +95,15 @@ export function KnowledgeView() {
       <div className="mx-auto max-w-[860px] px-6 pt-[38px] pb-[60px]">
         <div className="flex flex-wrap items-end gap-4">
           <div className="min-w-[260px] flex-1">
-            <h1 className="m-0 text-[26px] font-normal text-tx">Knowledge</h1>
-            <p className="mt-2 max-w-[50ch] text-sm leading-[1.65] text-tx3">
+            <h1 className="m-0 text-[26px] font-normal text-foreground">Knowledge</h1>
+            <p className="mt-2 max-w-[50ch] text-sm leading-[1.65] text-muted-foreground">
               Documents JARVIS can retrieve from during conversations. Answers cite the document (and section) they
               came from.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="h-10 cursor-pointer rounded-[11px] border-0 bg-ac px-[18px] text-[13.5px] font-semibold text-ac-fg hover:bg-ac-hi"
-          >
-            Upload documents
-          </button>
+          <Button type="button" size="lg" onClick={() => fileInputRef.current?.click()}>
+            <UploadIcon /> Upload documents
+          </Button>
           <input
             ref={fileInputRef}
             type="file"
@@ -128,46 +128,45 @@ export function KnowledgeView() {
             setDragActive(false);
             if (e.dataTransfer.files.length) void upload(e.dataTransfer.files);
           }}
-          className={`my-[22px] mb-5 rounded-2xl border border-dashed p-[26px] text-center transition-colors ${
-            dragActive ? 'border-ac bg-ac-xs' : 'border-ac-m bg-ac-xs'
+          className={`my-[22px] mb-5 rounded-2xl border border-dashed bg-primary/5 p-[26px] text-center transition-colors ${
+            dragActive ? 'border-primary' : 'border-primary/40'
           }`}
         >
-          <div className="text-[13.5px] text-ac-tx">Drop files here to index</div>
-          <div className="mt-[5px] font-mono text-[11.5px] text-tx4">PDF · DOCX · MD · TXT</div>
+          <div className="text-[13.5px] text-primary">Drop files here to index</div>
+          <div className="mt-[5px] font-mono text-[11.5px] text-muted-foreground">PDF · DOCX · MD · TXT</div>
         </div>
 
-        {error && <div className="mb-3 text-[13px] text-danger">{error}</div>}
+        {error && <div className="mb-3 text-[13px] text-destructive">{error}</div>}
 
-        <div className="mb-2.5 font-mono text-[10px] tracking-[0.14em] text-tx4">DOCUMENTS · {docs.length}</div>
+        <div className="mb-2.5 font-mono text-[10px] tracking-[0.14em] text-muted-foreground">
+          DOCUMENTS · {docs.length}
+        </div>
         {loading ? (
-          <div className="text-[13.5px] text-tx3">Loading documents…</div>
+          <div className="text-[13.5px] text-muted-foreground">Loading documents…</div>
         ) : docs.length === 0 ? (
-          <div className="text-[13.5px] text-tx3">Nothing uploaded yet - drop a file above to get started.</div>
+          <div className="text-[13.5px] text-muted-foreground">Nothing uploaded yet - drop a file above to get started.</div>
         ) : (
           <div className="flex flex-col gap-2.5">
             {docs.map((d) => (
-              <div
+              <Card
                 key={d.id}
-                className={`rounded-[13px] border p-[15px_17px] ${
-                  d.status === 'error'
-                    ? 'border-danger-line bg-danger-bg'
-                    : d.status === 'indexing'
-                      ? 'border-ac-m bg-ac-xs'
-                      : 'border-line bg-panel'
+                size="sm"
+                className={`p-[15px_17px] ${
+                  d.status === 'error' ? 'bg-destructive/5 ring-destructive/30' : d.status === 'indexing' ? 'bg-primary/5 ring-primary/30' : ''
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <span className={d.status === 'error' ? 'text-[#e0a0a0]' : 'text-tx3'}>▤</span>
+                  <FileTextIcon className={`size-4 ${d.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[14px] text-tx">{d.title}</div>
+                    <div className="text-[14px] text-foreground">{d.title}</div>
                     {d.status === 'error' ? (
-                      <div className="mt-[3px] text-[11.5px] text-[#f0b3b3]">
+                      <div className="mt-[3px] text-[11.5px] text-destructive">
                         {d.errorMessage ?? "Couldn't process this file."}
                       </div>
                     ) : (
                       <div
                         className={`mt-[3px] font-mono text-[11.5px] ${
-                          d.status === 'indexing' ? 'text-ac-tx' : 'text-tx4'
+                          d.status === 'indexing' ? 'text-primary' : 'text-muted-foreground'
                         }`}
                       >
                         {formatSize(d.sizeBytes)} · {d.format.toUpperCase()}
@@ -176,15 +175,15 @@ export function KnowledgeView() {
                     )}
                   </div>
                   {d.status === 'indexed' && (
-                    <span className="flex-none rounded-full border border-[rgba(120,220,160,0.28)] px-2.5 py-[3px] font-mono text-[10.5px] text-ok">
+                    <Badge variant="outline" className="flex-none border-ok/30 font-mono text-[10.5px] text-ok">
                       INDEXED
-                    </span>
+                    </Badge>
                   )}
-                  <span className="flex-none cursor-pointer text-tx4" onClick={() => void remove(d.id)}>
+                  <Button variant="ghost" size="sm" className="flex-none" onClick={() => void remove(d.id)}>
                     Remove
-                  </span>
+                  </Button>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         )}

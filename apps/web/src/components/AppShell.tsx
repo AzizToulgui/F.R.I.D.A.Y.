@@ -19,7 +19,6 @@ const ROUTE_TITLES: Record<Exclude<Route, 'chat'>, string> = {
   memory: 'Memory',
   knowledge: 'Knowledge',
   tools: 'Tools',
-  settings: 'Settings',
 };
 
 export function AppShell() {
@@ -31,6 +30,7 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const {
     msgs,
@@ -68,7 +68,10 @@ export function AppShell() {
         e.preventDefault();
         setSearchOpen(true);
       }
-      if (e.key === 'Escape') setSearchOpen(false);
+      if (e.key === 'Escape') {
+        setSearchOpen(false);
+        setSettingsOpen(false);
+      }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
@@ -99,7 +102,7 @@ export function AppShell() {
   );
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-bg">
+    <div className="relative flex h-screen w-full overflow-hidden bg-background">
       <Sidebar
         open={sidebarOpen}
         route={route}
@@ -109,7 +112,7 @@ export function AppShell() {
         onNewChat={newChat}
         onOpenSearch={() => setSearchOpen(true)}
         onNavigate={setRoute}
-        onOpenSettings={() => setRoute('settings')}
+        onOpenSettings={() => setSettingsOpen(true)}
         onSelectConversation={selectConversation}
         onDeleteConversation={(id) => {
           if (activeConversationId === id) setRoute('home');
@@ -117,7 +120,7 @@ export function AppShell() {
         }}
         onRenameConversation={(id, newTitle) => void renameConversation(id, newTitle)}
       />
-      <main className="flex min-w-0 flex-1 flex-col [background:radial-gradient(1200px_700px_at_50%_-10%,var(--ac-xs),transparent_70%),var(--bg)]">
+      <main className="flex min-w-0 flex-1 flex-col [background:radial-gradient(1200px_700px_at_50%_-10%,color-mix(in_oklch,var(--primary)_6%,transparent),transparent_70%),var(--background)]">
         <TopBar
           title={title}
           theme={theme}
@@ -141,7 +144,6 @@ export function AppShell() {
         )}
         {route === 'home' && (
           <HomeView
-            theme={theme}
             draft={draft}
             onDraftChange={setDraft}
             onSend={send}
@@ -153,7 +155,6 @@ export function AppShell() {
         {route === 'memory' && <MemoryView />}
         {route === 'knowledge' && <KnowledgeView />}
         {route === 'tools' && <ToolsView />}
-        {route === 'settings' && <SettingsView theme={theme} onSetTheme={setTheme} />}
       </main>
 
       {searchOpen && (
@@ -166,7 +167,11 @@ export function AppShell() {
         />
       )}
 
-      {voiceOpen && <VoiceOverlay theme={theme} onClose={() => setVoiceOpen(false)} />}
+      {voiceOpen && <VoiceOverlay onClose={() => setVoiceOpen(false)} />}
+
+      {settingsOpen && (
+        <SettingsView theme={theme} onSetTheme={setTheme} onClose={() => setSettingsOpen(false)} />
+      )}
     </div>
   );
 }

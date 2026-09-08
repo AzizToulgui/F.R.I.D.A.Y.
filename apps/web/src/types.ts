@@ -1,4 +1,4 @@
-export type Route = 'chat' | 'home' | 'memory' | 'knowledge' | 'tools' | 'settings';
+export type Route = 'chat' | 'home' | 'memory' | 'knowledge' | 'tools';
 
 export type Theme = 'dark' | 'light';
 

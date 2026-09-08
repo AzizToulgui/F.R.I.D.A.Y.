@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { CheckIcon, CopyIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { MarkdownMessage } from '@/components/MarkdownMessage';
 import { MessageComposer } from '@/components/MessageComposer';
 import type { ChatMessage } from '@/types';
@@ -22,6 +24,15 @@ const SUGGESTIONS = [
   'Search my documents for anything about pricing',
   'What time is it right now?',
 ];
+
+function CopyButton({ copied, onClick }: { copied: boolean; onClick: () => void }) {
+  return (
+    <Button type="button" variant="ghost" size="sm" onClick={onClick} className="h-6 gap-1 px-1.5 text-xs">
+      {copied ? <CheckIcon className="size-3" /> : <CopyIcon className="size-3" />}
+      {copied ? 'Copied' : 'Copy'}
+    </Button>
+  );
+}
 
 export function ChatView({
   msgs,
@@ -74,14 +85,12 @@ export function ChatView({
                   <div className="max-w-[78%]">
                     <div
                       dir="auto"
-                      className="rounded-tl-2xl rounded-tr-2xl rounded-br-[4px] rounded-bl-2xl border border-line bg-bubble px-4 py-3 text-[14.5px] leading-relaxed text-tx"
+                      className="rounded-tl-2xl rounded-tr-2xl rounded-br-[4px] rounded-bl-2xl border bg-muted px-4 py-3 text-[14.5px] leading-relaxed text-foreground"
                     >
                       {m.text}
                     </div>
-                    <div className="mt-1.5 flex justify-end gap-2.5 text-[11px] text-tx4 hover:text-tx3">
-                      <span className="cursor-pointer" onClick={() => copy(i, m.text)}>
-                        {copiedIndex === i ? 'Copied' : 'Copy'}
-                      </span>
+                    <div className="mt-1 flex justify-end">
+                      <CopyButton copied={copiedIndex === i} onClick={() => copy(i, m.text)} />
                     </div>
                   </div>
                 </div>
@@ -92,19 +101,15 @@ export function ChatView({
                 <div className="mt-0.5 grid h-[26px] w-[26px] flex-none place-items-center rounded-full border border-ac-l">
                   <div className="h-1.5 w-1.5 rounded-full bg-ac-tx shadow-[0_0_9px_2px_rgba(95,216,255,0.7)]" />
                 </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-3.5">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div dir="auto">
                     <MarkdownMessage text={m.text} />
                     {isLast && streaming && (
-                      <span className="ml-0.5 animate-[jv-blink_1s_steps(1)_infinite] text-ac">▌</span>
+                      <span className="ml-0.5 animate-[jv-blink_1s_steps(1)_infinite] text-primary">▌</span>
                     )}
                   </div>
                   {m.text && !(isLast && streaming) && (
-                    <div className="flex items-center gap-3.5 text-xs text-tx4 opacity-75 hover:text-tx2 hover:opacity-100">
-                      <span className="cursor-pointer" onClick={() => copy(i, m.text)}>
-                        {copiedIndex === i ? 'Copied' : 'Copy'}
-                      </span>
-                    </div>
+                    <CopyButton copied={copiedIndex === i} onClick={() => copy(i, m.text)} />
                   )}
                 </div>
               </div>
@@ -114,14 +119,16 @@ export function ChatView({
           {msgs.length === 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {SUGGESTIONS.map((text) => (
-                <button
+                <Button
                   key={text}
                   type="button"
-                  className="cursor-pointer rounded-full border border-line2 bg-transparent px-[13px] py-2 text-[12.5px] text-tx2 hover:border-ac-m hover:text-tx"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
                   onClick={() => onSuggestion(text)}
                 >
                   {text}
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -130,7 +137,7 @@ export function ChatView({
 
       <div className="flex-none px-6 pb-[22px]">
         <div className="mx-auto max-w-[760px]">
-          {error && <div className="mb-2 text-[12.5px] text-danger">{error}</div>}
+          {error && <div className="mb-2 text-[12.5px] text-destructive">{error}</div>}
           <MessageComposer
             draft={draft}
             onDraftChange={onDraftChange}
@@ -138,7 +145,9 @@ export function ChatView({
             onOpenVoice={onOpenVoice}
             onOpenTools={onOpenTools}
           />
-          <div className="mt-2.5 text-center text-[11px] text-tx5">JARVIS can make mistakes. Verify important details.</div>
+          <div className="mt-2.5 text-center text-[11px] text-muted-foreground">
+            JARVIS can make mistakes. Verify important details.
+          </div>
         </div>
       </div>
     </div>

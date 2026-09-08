@@ -1,6 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/lib/auth/AuthProvider';
 
 interface Memory {
@@ -108,39 +112,35 @@ export function MemoryView() {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-[820px] px-6 pt-[38px] pb-[60px]">
-        <h1 className="m-0 text-[26px] font-normal text-tx">Memory</h1>
-        <p className="mt-2 max-w-[52ch] text-sm leading-[1.65] text-tx3">
+        <h1 className="m-0 text-[26px] font-normal text-foreground">Memory</h1>
+        <p className="mt-2 max-w-[52ch] text-sm leading-[1.65] text-muted-foreground">
           JARVIS keeps a small set of facts so future conversations start informed. Everything here is editable, and
           nothing is stored without appearing on this page.
         </p>
         <div className="my-[22px] mb-[18px] flex flex-wrap gap-2.5">
-          <input
+          <Input
             aria-label="Search memories"
             placeholder="Search memories…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-[38px] min-w-[220px] flex-1 rounded-[10px] border border-line2 bg-panel px-[13px] text-[13.5px] text-tx outline-none focus:border-ac-m"
+            className="h-[38px] min-w-[220px] flex-1"
           />
-          <button
+          <Button
             type="button"
+            variant="destructive"
             onClick={() => void clearAll()}
             disabled={memories.length === 0}
-            className={`h-[38px] cursor-pointer rounded-[10px] border px-3.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-40 ${
-              confirmingClear
-                ? 'border-danger bg-danger-bg text-danger'
-                : 'border-danger-line bg-transparent text-danger hover:bg-danger-bg'
-            }`}
           >
             {confirmingClear ? 'Click again to confirm' : 'Clear all'}
-          </button>
+          </Button>
         </div>
 
-        {error && <div className="mb-3 text-[13px] text-danger">{error}</div>}
+        {error && <div className="mb-3 text-[13px] text-destructive">{error}</div>}
 
         {loading ? (
-          <div className="text-[13.5px] text-tx3">Loading memories…</div>
+          <div className="text-[13.5px] text-muted-foreground">Loading memories…</div>
         ) : filtered.length === 0 ? (
-          <div className="text-[13.5px] text-tx3">
+          <div className="text-[13.5px] text-muted-foreground">
             {memories.length === 0
               ? "Nothing remembered yet - it fills in as you talk to JARVIS."
               : 'No memories match your search.'}
@@ -151,50 +151,56 @@ export function MemoryView() {
               const fresh = Date.now() - new Date(m.createdAt).getTime() < RECENT_MS;
               const isEditing = editingId === m.id;
               return (
-                <div
+                <Card
                   key={m.id}
-                  className={`flex items-start gap-3.5 rounded-[13px] border p-[15px_17px] hover:border-ac-m ${
-                    fresh ? 'border-ac-m bg-ac-xs' : 'border-line bg-panel'
+                  size="sm"
+                  className={`flex-row items-start gap-3.5 p-[15px_17px] hover:ring-primary/30 ${
+                    fresh ? 'bg-primary/5 ring-primary/30' : ''
                   }`}
                 >
                   <div className="flex-1">
                     {isEditing ? (
-                      <textarea
+                      <Textarea
                         autoFocus
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
                         rows={2}
-                        className="w-full resize-none rounded-md border border-line2 bg-transparent p-2 text-[14px] leading-[1.55] text-tx outline-none focus:border-ac-m"
+                        className="resize-none text-[14px] leading-[1.55]"
                       />
                     ) : (
-                      <div className="text-[14px] leading-[1.55] text-tx">{m.content}</div>
+                      <div className="text-[14px] leading-[1.55] text-foreground">{m.content}</div>
                     )}
-                    <div className={`mt-1.5 font-mono text-[11px] ${fresh ? 'text-ac-tx' : 'text-tx4'}`}>
+                    <div className={`mt-1.5 font-mono text-[11px] ${fresh ? 'text-primary' : 'text-muted-foreground'}`}>
                       {fresh ? 'JUST REMEMBERED' : formatMeta(m)}
                     </div>
                   </div>
-                  <div className="flex flex-none gap-3 text-[12.5px] text-tx3">
+                  <div className="flex flex-none gap-1">
                     {isEditing ? (
                       <>
-                        <span className="cursor-pointer" onClick={() => void saveEdit(m.id)}>
+                        <Button variant="ghost" size="sm" onClick={() => void saveEdit(m.id)}>
                           Save
-                        </span>
-                        <span className="cursor-pointer" onClick={cancelEdit}>
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={cancelEdit}>
                           Cancel
-                        </span>
+                        </Button>
                       </>
                     ) : (
                       <>
-                        <span className="cursor-pointer" onClick={() => startEdit(m)}>
+                        <Button variant="ghost" size="sm" onClick={() => startEdit(m)}>
                           Edit
-                        </span>
-                        <span className="cursor-pointer text-[#c98d8d]" onClick={() => void remove(m.id)}>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => void remove(m.id)}
+                        >
                           Delete
-                        </span>
+                        </Button>
                       </>
                     )}
                   </div>
-                </div>
+                </Card>
               );
             })}
           </div>

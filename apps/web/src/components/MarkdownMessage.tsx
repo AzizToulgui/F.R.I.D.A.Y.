@@ -5,6 +5,8 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { CheckIcon, CopyIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // Gemini's real replies use markdown (JARVIS_TEXT_SYSTEM_PROMPT explicitly
 // allows "plain prose and light markdown") - this renders it properly
@@ -37,14 +39,15 @@ function CodeBlock({ children, ...props }: ComponentPropsWithoutRef<'pre'>) {
   };
 
   return (
-    <div className="my-2 overflow-hidden rounded-xl border border-line bg-bg2">
-      <div className="flex items-center border-b border-line px-3 py-2 font-mono text-[10.5px] tracking-[0.1em] text-tx4">
+    <div className="my-2 overflow-hidden rounded-xl border bg-muted/40">
+      <div className="flex items-center border-b px-3 py-2 font-mono text-[10.5px] tracking-[0.1em] text-muted-foreground">
         {language.toUpperCase()}
-        <button type="button" onClick={copy} className="ml-auto cursor-pointer text-tx3 hover:text-tx">
+        <Button type="button" variant="ghost" size="sm" onClick={copy} className="ml-auto h-6 gap-1 px-1.5 text-xs">
+          {copied ? <CheckIcon className="size-3" /> : <CopyIcon className="size-3" />}
           {copied ? 'copied' : 'copy'}
-        </button>
+        </Button>
       </div>
-      <pre className="m-0 overflow-x-auto p-3.5 font-mono text-[12.5px] leading-[1.75] text-tx2" {...props}>
+      <pre className="m-0 overflow-x-auto p-3.5 font-mono text-[12.5px] leading-[1.75] text-foreground/90" {...props}>
         {children}
       </pre>
     </div>
@@ -64,37 +67,37 @@ function InlineCode({ className, children, ...props }: ComponentPropsWithoutRef<
     );
   }
   return (
-    <code className="rounded bg-line px-1.5 py-0.5 text-[0.9em] text-ac-tx" {...props}>
+    <code className="rounded bg-muted px-1.5 py-0.5 text-[0.9em] text-primary" {...props}>
       {children}
     </code>
   );
 }
 
 const components: Components = {
-  p: ({ children }) => <p className="text-[15px] leading-[1.72] text-tx2">{children}</p>,
-  ul: ({ children }) => <ul className="list-disc space-y-1 pl-5 text-[15px] leading-[1.8] text-tx2">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal space-y-1 pl-5 text-[15px] leading-[1.8] text-tx2">{children}</ol>,
+  p: ({ children }) => <p className="text-[15px] leading-[1.72] text-foreground/90">{children}</p>,
+  ul: ({ children }) => <ul className="list-disc space-y-1 pl-5 text-[15px] leading-[1.8] text-foreground/90">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal space-y-1 pl-5 text-[15px] leading-[1.8] text-foreground/90">{children}</ol>,
   li: ({ children }) => <li>{children}</li>,
   a: ({ children, href }) => (
-    <a href={href} target="_blank" rel="noreferrer noopener" className="text-ac-tx underline hover:text-ac">
+    <a href={href} target="_blank" rel="noreferrer noopener" className="text-primary underline hover:text-primary/80">
       {children}
     </a>
   ),
-  strong: ({ children }) => <strong className="font-semibold text-tx">{children}</strong>,
-  h1: ({ children }) => <h3 className="text-[18px] font-medium text-tx">{children}</h3>,
-  h2: ({ children }) => <h3 className="text-[16.5px] font-medium text-tx">{children}</h3>,
-  h3: ({ children }) => <h3 className="text-[15.5px] font-medium text-tx">{children}</h3>,
+  strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+  h1: ({ children }) => <h3 className="text-[18px] font-medium text-foreground">{children}</h3>,
+  h2: ({ children }) => <h3 className="text-[16.5px] font-medium text-foreground">{children}</h3>,
+  h3: ({ children }) => <h3 className="text-[15.5px] font-medium text-foreground">{children}</h3>,
   blockquote: ({ children }) => (
-    <blockquote className="border-l-2 border-line2 pl-3 text-tx3 italic">{children}</blockquote>
+    <blockquote className="border-l-2 pl-3 text-muted-foreground italic">{children}</blockquote>
   ),
-  hr: () => <hr className="border-line" />,
+  hr: () => <hr />,
   table: ({ children }) => (
     <div className="overflow-x-auto">
-      <table className="border-collapse text-[13.5px] text-tx2">{children}</table>
+      <table className="border-collapse text-[13.5px] text-foreground/90">{children}</table>
     </div>
   ),
-  th: ({ children }) => <th className="border border-line px-2.5 py-1.5 text-left text-tx">{children}</th>,
-  td: ({ children }) => <td className="border border-line px-2.5 py-1.5">{children}</td>,
+  th: ({ children }) => <th className="border px-2.5 py-1.5 text-left text-foreground">{children}</th>,
+  td: ({ children }) => <td className="border px-2.5 py-1.5">{children}</td>,
   pre: CodeBlock,
   code: InlineCode,
 };

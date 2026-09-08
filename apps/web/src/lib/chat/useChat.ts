@@ -12,9 +12,15 @@ const ACTIVE_CONVERSATION_KEY = 'jarvis:activeConversationId';
 // The backend auto-titles a new conversation in the background (see
 // ConversationTitlingProcessor) once it has enough of the first exchange to
 // work with - it isn't done by the time send()'s own refreshConversations()
-// runs right after the turn, so a second, delayed refresh gives it a
-// realistic window to land before the sidebar settles on "New conversation".
-const TITLE_REFRESH_DELAY_MS = 2500;
+// runs right after the turn, so instead of one delayed guess we poll until
+// the title actually changes, no page refresh required. The timeout has to
+// cover the backend's real worst case, not the happy path: the titling job
+// now retries up to 3 times on failure (see conversation-engine.service.ts),
+// and a single attempt alone was observed taking ~30s when Gemini is slow -
+// so 3 attempts plus exponential backoff between them can run past 100s.
+const DEFAULT_CONVERSATION_TITLE = 'New conversation';
+const TITLE_POLL_INTERVAL_MS = 4000;
+const TITLE_POLL_TIMEOUT_MS = 150000;
 
 interface ConversationResponse {
   id: string;
@@ -105,14 +111,43 @@ export function useChat(): UseChatResult {
   // conversation the user just backed out of.
   const requestSeqRef = useRef(0);
 
+  const fetchConversationsList = useCallback(async () => {
+    const list = await authFetch<ConversationResponse[]>('/conversations');
+    return list.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt }));
+  }, [authFetch]);
+
   const refreshConversations = useCallback(async () => {
     try {
-      const list = await authFetch<ConversationResponse[]>('/conversations');
-      setConversations(list.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt })));
+      setConversations(await fetchConversationsList());
     } catch {
       // Best-effort - the sidebar just keeps showing whatever it last had.
     }
-  }, [authFetch]);
+  }, [fetchConversationsList]);
+
+  // Keeps re-checking a freshly-created conversation's title (without a page
+  // reload) until ConversationTitlingProcessor lands it or we give up - see
+  // TITLE_POLL_TIMEOUT_MS above for why one delayed check wasn't enough.
+  const pollForTitle = useCallback(
+    (conversationId: string) => {
+      const deadline = Date.now() + TITLE_POLL_TIMEOUT_MS;
+      const tick = async () => {
+        let list: ConversationSummary[];
+        try {
+          list = await fetchConversationsList();
+        } catch {
+          return; // best-effort - drop this poll chain on network failure
+        }
+        setConversations(list);
+        const current = list.find((c) => c.id === conversationId);
+        const stillDefault = !current || current.title === DEFAULT_CONVERSATION_TITLE;
+        if (stillDefault && Date.now() < deadline) {
+          setTimeout(() => void tick(), TITLE_POLL_INTERVAL_MS);
+        }
+      };
+      setTimeout(() => void tick(), TITLE_POLL_INTERVAL_MS);
+    },
+    [fetchConversationsList],
+  );
 
   const setActive = useCallback((id: string | null) => {
     conversationIdRef.current = id;
@@ -224,7 +259,11 @@ export function useChat(): UseChatResult {
 
         const response = await authFetchStream(`/conversations/${conversationIdRef.current}/turns`, {
           method: 'POST',
-          body: JSON.stringify({ content: trimmed }),
+          // Lets the model resolve times the user gives without a timezone
+          // (e.g. "remind me at 11:30") against the user's actual local
+          // time instead of drifting toward UTC - see
+          // ConversationEngineService.describeTimezone.
+          body: JSON.stringify({ content: trimmed, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
         });
         if (!response.body) throw new Error('Streaming is not supported in this browser.');
 
@@ -244,15 +283,12 @@ export function useChat(): UseChatResult {
         streamingRef.current = false;
         setStreaming(false);
         void refreshConversations();
-        if (isNewConversation) {
-          // The backend's auto-title job (ConversationTitlingProcessor)
-          // typically isn't finished yet by the time the refresh above
-          // runs - one more, after it's had a realistic chance to land.
-          setTimeout(() => void refreshConversations(), TITLE_REFRESH_DELAY_MS);
+        if (isNewConversation && conversationIdRef.current) {
+          pollForTitle(conversationIdRef.current);
         }
       }
     },
-    [authFetch, authFetchStream, appendDelta, setActive, refreshConversations],
+    [authFetch, authFetchStream, appendDelta, setActive, refreshConversations, pollForTitle],
   );
 
   return {
