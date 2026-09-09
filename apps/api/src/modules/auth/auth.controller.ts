@@ -14,6 +14,7 @@ import { AppConfig } from '../../config/app.config';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh.dto';
 import { Public } from './decorators/public.decorator';
 import { IssuedTokens, RequestMeta } from './interfaces/auth-tokens.interface';
 import { AuthenticatedUser } from './interfaces/authenticated-user.interface';
@@ -24,6 +25,12 @@ interface AuthResponse {
   user: AuthenticatedUser;
   accessToken: string;
   accessTokenExpiresIn: number;
+  // Only meaningful to a client that can't rely on the httpOnly cookie (i.e.
+  // mobile) - it must persist this itself (e.g. secure storage) and send it
+  // back in the body on /auth/refresh and /auth/logout. Web already gets the
+  // same token via Set-Cookie and can safely ignore these fields.
+  refreshToken: string;
+  refreshTokenExpiresAt: Date;
 }
 
 @Controller('auth')
@@ -66,10 +73,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
   async refresh(
+    @Body() dto: RefreshDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<AuthResponse> {
-    const rawToken = this.readRefreshCookie(req);
+    const rawToken = this.resolveRefreshToken(req, dto);
     const issued = await this.authService.refresh(rawToken, this.requestMeta(req));
     return this.respond(issued, reply);
   }
@@ -78,18 +86,23 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post('logout')
   async logout(
+    @Body() dto: RefreshDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<void> {
-    const rawToken = req.cookies?.[REFRESH_COOKIE_NAME];
+    const rawToken = req.cookies?.[REFRESH_COOKIE_NAME] ?? dto.refreshToken;
     if (rawToken) {
       await this.authService.logout(rawToken);
     }
     reply.clearCookie(REFRESH_COOKIE_NAME, { path: this.refreshCookiePath });
   }
 
-  private readRefreshCookie(req: FastifyRequest): string {
-    const raw = req.cookies?.[REFRESH_COOKIE_NAME];
+  // Web relies entirely on the httpOnly cookie; mobile has no cookie jar and
+  // sends the refresh token it persisted itself in the request body instead.
+  // Cookie wins when both are somehow present - it's the trusted, browser
+  // owned channel.
+  private resolveRefreshToken(req: FastifyRequest, dto: RefreshDto): string {
+    const raw = req.cookies?.[REFRESH_COOKIE_NAME] ?? dto.refreshToken;
     if (!raw) {
       throw new UnauthorizedException('Missing refresh token');
     }
@@ -117,6 +130,8 @@ export class AuthController {
       user: issued.user,
       accessToken: issued.accessToken,
       accessTokenExpiresIn: issued.accessTokenExpiresIn,
+      refreshToken: issued.refreshToken,
+      refreshTokenExpiresAt: issued.refreshTokenExpiresAt,
     };
   }
 }
