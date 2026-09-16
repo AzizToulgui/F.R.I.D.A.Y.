@@ -1,6 +1,6 @@
 'use client';
 
-import { AudioLinesIcon, MenuIcon, MoonIcon, SunIcon } from 'lucide-react';
+import { AudioLinesIcon, FlameIcon, MenuIcon, MoonIcon, SunIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { Theme } from '@/types';
@@ -11,9 +11,17 @@ interface TopBarProps {
   onToggleSidebar: () => void;
   onToggleTheme: () => void;
   onOpenVoice: () => void;
+  onOpenVoiceSavage: () => void;
 }
 
-export function TopBar({ title, theme, onToggleSidebar, onToggleTheme, onOpenVoice }: TopBarProps) {
+export function TopBar({
+  title,
+  theme,
+  onToggleSidebar,
+  onToggleTheme,
+  onOpenVoice,
+  onOpenVoiceSavage,
+}: TopBarProps) {
   return (
     <header className="flex h-14 flex-none items-center gap-3 border-b px-5 backdrop-blur-[8px]">
       <Button type="button" variant="ghost" size="icon-sm" onClick={onToggleSidebar} aria-label="Toggle sidebar">
@@ -38,6 +46,15 @@ export function TopBar({ title, theme, onToggleSidebar, onToggleTheme, onOpenVoi
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={onOpenVoice}>
           <AudioLinesIcon /> Voice mode
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onOpenVoiceSavage}
+          className="text-orange-500 hover:text-orange-400"
+        >
+          <FlameIcon /> Savage Mode
         </Button>
       </div>
     </header>

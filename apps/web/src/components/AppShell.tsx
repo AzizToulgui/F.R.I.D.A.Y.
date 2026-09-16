@@ -33,7 +33,7 @@ export function AppShell() {
   const [route, setRoute] = useState<Route>("home");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState<false | "normal" | "savage">(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<
     string | undefined
@@ -125,7 +125,8 @@ export function AppShell() {
     [sendChat],
   );
 
-  const openVoice = useCallback(() => setVoiceOpen(true), []);
+  const openVoice = useCallback(() => setVoiceOpen("normal"), []);
+  const openVoiceSavage = useCallback(() => setVoiceOpen("savage"), []);
 
   const selectConversation = useCallback(
     (id: string) => {
@@ -165,6 +166,7 @@ export function AppShell() {
             setTheme((t) => (t === "dark" ? "light" : "dark"))
           }
           onOpenVoice={openVoice}
+          onOpenVoiceSavage={openVoiceSavage}
         />
         {route === "chat" && (
           <ChatView
@@ -208,7 +210,7 @@ export function AppShell() {
         />
       )}
 
-      {voiceOpen && <VoiceOverlay onClose={() => setVoiceOpen(false)} />}
+      {voiceOpen && <VoiceOverlay mode={voiceOpen} onClose={() => setVoiceOpen(false)} />}
 
       {settingsOpen && (
         <SettingsView

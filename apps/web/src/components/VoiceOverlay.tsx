@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MicIcon, MicOffIcon, XIcon } from 'lucide-react';
+import { FlameIcon, MicIcon, MicOffIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Persona, type PersonaState } from '@/components/ai-elements/persona';
 import { useLiveSession } from '@/lib/live/useLiveSession';
@@ -9,6 +9,8 @@ import type { OrbMode } from '@/types';
 
 interface VoiceOverlayProps {
   onClose: () => void;
+  /** Which persona to request from the backend - purely UI chrome plus the flag passed to start(). Read once at mount; not a mid-call toggle. */
+  mode?: 'normal' | 'savage';
 }
 
 const PERSONA_STATE_BY_ORB_MODE: Record<OrbMode, PersonaState> = {
@@ -56,7 +58,7 @@ const LABELS: Record<OrbMode, [string, string]> = {
   error: ["Connection lost", 'SEE STATUS BELOW'],
 };
 
-export function VoiceOverlay({ onClose }: VoiceOverlayProps) {
+export function VoiceOverlay({ onClose, mode = 'normal' }: VoiceOverlayProps) {
   const {
     state,
     statusMessage,
@@ -77,9 +79,10 @@ export function VoiceOverlay({ onClose }: VoiceOverlayProps) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    void start();
+    void start({ savageMode: mode === 'savage' });
     return () => stop();
-    // Connect exactly once when the overlay mounts, disconnect on unmount.
+    // Connect exactly once when the overlay mounts, disconnect on unmount -
+    // `mode` is read once here, not a mid-call toggle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -139,8 +142,13 @@ export function VoiceOverlay({ onClose }: VoiceOverlayProps) {
       tabIndex={-1}
       className="absolute inset-0 z-50 flex animate-[jv-rise_0.2s_ease-out] flex-col outline-none [background:radial-gradient(900px_620px_at_50%_42%,var(--ac-xs),transparent_70%),var(--bg-voice)]"
     >
-      <div className="relative flex h-14 flex-none items-center justify-center">
+      <div className="relative flex h-14 flex-none items-center justify-center gap-2">
         <div className="font-mono text-[10.5px] tracking-[0.34em] text-muted-foreground">FRIDAY</div>
+        {mode === 'savage' && (
+          <span className="flex items-center gap-1 rounded-full border border-orange-500/40 bg-orange-500/10 px-2 py-0.5 font-mono text-[9.5px] tracking-[0.14em] text-orange-500">
+            <FlameIcon className="size-3" /> SAVAGE MODE
+          </span>
+        )}
         <Button
           type="button"
           variant="outline"
@@ -193,7 +201,13 @@ export function VoiceOverlay({ onClose }: VoiceOverlayProps) {
         {errorMessage && (
           <div className="flex-none text-[12.5px] text-destructive">
             {errorMessage}{' '}
-            <Button type="button" variant="link" size="sm" onClick={() => void start()} className="h-auto p-0 text-destructive">
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              onClick={() => void start({ savageMode: mode === 'savage' })}
+              className="h-auto p-0 text-destructive"
+            >
               Retry
             </Button>
           </div>

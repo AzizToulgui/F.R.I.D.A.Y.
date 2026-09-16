@@ -84,6 +84,11 @@ export interface EmbeddingResult {
 export interface LiveVoiceOptions {
   voiceName?: string;
   deliveryStyleInstruction?: string;
+  // Per-call Tunisian Savage Mode flag from a dedicated launch button (see
+  // LiveController.createSession) - when true, GeminiProvider builds the
+  // system instruction from buildVoiceSystemPrompt's savage branch instead
+  // of deliveryStyleInstruction. Never sourced from a saved user preference.
+  savageMode?: boolean;
 }
 
 // A single synthesized audio clip (see AIProvider.synthesizeSpeech) - raw

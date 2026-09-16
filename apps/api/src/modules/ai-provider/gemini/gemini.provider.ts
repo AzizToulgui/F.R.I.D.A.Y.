@@ -352,7 +352,7 @@ export class GeminiProvider extends AIProvider {
               // A Live session has no per-turn system instruction like text
               // generation does, so FRIDAY's identity/multilingual behavior
               // has to be locked in here, once, for the whole session.
-              systemInstruction: buildVoiceSystemPrompt(voice?.deliveryStyleInstruction),
+              systemInstruction: buildVoiceSystemPrompt(voice?.deliveryStyleInstruction, voice?.savageMode),
               tools: toGeminiTools(tools),
               // Omitted entirely (not sent as undefined) when the user hasn't
               // picked one, so Gemini falls back to its own default voice

@@ -1,10 +1,11 @@
-import { Controller, Logger, Post } from '@nestjs/common';
+import { Body, Controller, Logger, Post } from '@nestjs/common';
 import { AIProvider } from '../ai-provider/ai-provider.interface';
 import { deliveryStyleInstructionFor } from '../ai-provider/voice-options';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { ToolRegistryService } from '../tools/tool-registry.service';
 import { UsersService } from '../users/users.service';
+import { CreateLiveSessionDto } from './dto/create-live-session.dto';
 
 @Controller('live')
 export class LiveController {
@@ -24,12 +25,13 @@ export class LiveController {
   // (server-side) rather than passed by the client when it connects - see
   // AIProvider.mintLiveSessionToken.
   @Post('session')
-  async createSession(@CurrentUser() user: AuthenticatedUser) {
+  async createSession(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateLiveSessionDto) {
     this.logger.log(`Minting Gemini Live session token for user ${user.id}`);
     const fullUser = await this.usersService.findById(user.id);
     return this.aiProvider.mintLiveSessionToken(this.toolRegistry.getDeclarations('voice', fullUser?.disabledTools), {
       voiceName: fullUser?.voiceName ?? undefined,
       deliveryStyleInstruction: deliveryStyleInstructionFor(fullUser?.voiceDeliveryStyle),
+      savageMode: dto.savageMode === true,
     });
   }
 }

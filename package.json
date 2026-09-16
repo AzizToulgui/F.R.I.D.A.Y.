@@ -14,6 +14,9 @@
     "api:test:e2e": "pnpm --filter @friday/api test:e2e",
     "web:dev": "pnpm --filter @friday/web dev",
     "web:build": "pnpm --filter @friday/web build",
-    "web:lint": "pnpm --filter @friday/web lint"
+    "web:lint": "pnpm --filter @friday/web lint",
+    "mobile:start": "pnpm --filter @friday/mobile start",
+    "mobile:android": "pnpm --filter @friday/mobile android",
+    "mobile:ios": "pnpm --filter @friday/mobile ios"
   }
 }

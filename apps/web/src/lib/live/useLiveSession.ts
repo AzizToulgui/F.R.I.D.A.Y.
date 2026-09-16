@@ -54,7 +54,7 @@ export interface UseLiveSessionResult {
   latencyMs: number | null;
   muted: boolean;
   toggleMuted: () => void;
-  start: () => Promise<void>;
+  start: (options?: { savageMode?: boolean }) => Promise<void>;
   stop: () => void;
   /** Current mic input level, 0-1 - polled from an animation loop (e.g. the orb), not reactive state. */
   getMicLevel: () => number;
@@ -85,6 +85,11 @@ export function useLiveSession(): UseLiveSessionResult {
   const interruptedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const memoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const memoLabelRef = useRef<string | undefined>(undefined);
+  // Read inside getToken's closure (not captured by value) so an automatic
+  // reconnect - which calls getToken() again, see LiveClient.attemptConnect -
+  // keeps requesting Savage Mode for the rest of the call, not just the
+  // initial connect.
+  const savageModeRef = useRef(false);
 
   // Stops teeing mic chunks (see AudioCapture.stopMemoRecording), uploads the
   // resulting WAV, and clears the safety-net timeout - shared by both the
@@ -225,7 +230,11 @@ export function useLiveSession(): UseLiveSessionResult {
     };
 
     const client = new LiveClient({
-      getToken: () => authFetch<LiveSessionTokenResponse>('/live/session', { method: 'POST' }),
+      getToken: () =>
+        authFetch<LiveSessionTokenResponse>('/live/session', {
+          method: 'POST',
+          body: JSON.stringify({ savageMode: savageModeRef.current }),
+        }),
       executeToolCalls,
       callbacks: {
         onStateChange: (next) => {
@@ -281,7 +290,8 @@ export function useLiveSession(): UseLiveSessionResult {
     return client;
   }, [authFetch, uploadMemo, playMemo]);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (options?: { savageMode?: boolean }) => {
+    savageModeRef.current = options?.savageMode ?? false;
     setErrorMessage(null);
     const client = ensureClient();
     // Resume the playback AudioContext right now, as close to the user's
